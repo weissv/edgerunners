@@ -60,28 +60,31 @@ console.log("Применение static UPLOADS_DIR...");
 app.use('/uploads', express.static(UPLOADS_DIR));
 console.log("Static middleware применены");
 
+// Маршруты API (оставляем как есть)// ... (весь код до определения маршрутов API) ...
+
 // Маршруты API (оставляем как есть)
 console.log("Определение GET /api/projects...");
-app.get('/api/projects', async (req, res) => { try { const projects = await readData('projects.json'); res.json(projects); } catch (error) { res.status(500).json({ message: "Ошибка получения списка проектов", error: error.message }); } });
+app.get('/api/projects', async (req, res) => { /* ... код ... */ });
 console.log("Определение GET /api/contractors...");
-app.get('/api/contractors', async (req, res) => { try { const contractors = await readData('contractors.json'); res.json(contractors); } catch (error) { res.status(500).json({ message: "Ошибка получения списка подрядчиков", error: error.message }); } });
+app.get('/api/contractors', async (req, res) => { /* ... код ... */ });
 console.log("Определение GET /api/reports...");
-app.get('/api/reports', async (req, res) => { try { const { projectId } = req.query; let reports = await readData('reports.json'); if (projectId) { reports = reports.filter(report => String(report.projectId) === String(projectId)); } reports.sort((a, b) => new Date(b.date) - new Date(a.date)); res.json(reports); } catch (error) { res.status(500).json({ message: "Ошибка получения списка отчетов", error: error.message }); } });
+app.get('/api/reports', async (req, res) => { /* ... код ... */ });
 console.log("Определение POST /api/reports...");
-app.post('/api/reports', upload.single('report-photo'), async (req, res) => { try { const { projectId, comment, latitude, longitude } = req.body; if (!projectId || !comment || comment.trim() === '') { if (req.file) { await fs.unlink(req.file.path).catch(err => console.error("Ошибка удаления файла:", err)); } return res.status(400).json({ message: "ID проекта и комментарий обязательны." }); } let allReports = await readData('reports.json'); let allProjects = await readData('projects.json'); const newReport = { id: uuidv4(), projectId: projectId, comment: comment.trim(), date: new Date().toISOString(), photoPath: req.file ? `/uploads/${req.file.filename}` : null, location: (latitude && longitude && !isNaN(latitude) && !isNaN(longitude)) ? { lat: parseFloat(latitude), lon: parseFloat(longitude) } : null }; allReports.push(newReport); await writeData('reports.json', allReports); const projectIndex = allProjects.findIndex(p => String(p.id) === String(projectId)); let updatedProject = null; if (projectIndex !== -1) { const project = allProjects[projectIndex]; const projectReports = allReports.filter(r => String(r.projectId) === String(projectId)); let alertLevel = 0; if (project.status === "Завершено" && projectReports.length >= 1) alertLevel = 1; else if (project.status === "В процессе" && projectReports.length > 3) alertLevel = 2; else if (project.status === "В процессе" && projectReports.length >= 1) alertLevel = 1; if (project.citizenAlertLevel !== alertLevel) { allProjects[projectIndex].citizenAlertLevel = alertLevel; await writeData('projects.json', allProjects); updatedProject = allProjects[projectIndex]; console.log(`Обновлен уровень тревоги для проекта ${projectId} на ${alertLevel}`); } else { updatedProject = project; } } res.status(201).json({ report: newReport, updatedProject: updatedProject }); } catch (error) { console.error("Ошибка при отправке отчета:", error); if (req.file) { await fs.unlink(req.file.path).catch(err => console.error("Ошибка удаления файла:", err)); } if (error instanceof multer.MulterError) return res.status(400).json({ message: "Ошибка загрузки файла", error: error.message }); else if (error.message.includes('Недопустимый тип файла')) return res.status(400).json({ message: error.message }); res.status(500).json({ message: "Внутренняя ошибка сервера при отправке отчета", error: error.message }); } });
+app.post('/api/reports', upload.single('report-photo'), async (req, res) => { /* ... код ... */ });
 console.log("Маршруты API определены");
 
-// Catch-All обработчик (оставляем как есть)
-console.log("Определение GET * ...");
-app.get('*', (req, res) => {
-    console.log(`Обработчик GET * сработал для пути: ${req.path}`); // Добавим лог сюда
-    res.sendFile(path.join(PUBLIC_DIR, 'index.html'));
-});
-console.log("Catch-all обработчик определен");
+// --->>> ВРЕМЕННО ЗАКОММЕНТИРОВАЛИ Catch-All обработчик для теста <<<---
+// console.log("Определение GET * ...");
+// app.get('*', (req, res) => {
+//     console.log(`Обработчик GET * сработал для пути: ${req.path}`); // Добавим лог сюда
+//     res.sendFile(path.join(PUBLIC_DIR, 'index.html'));
+// });
+// console.log("Catch-all обработчик определен");
+// ---------------------------------------------------------
 
 // Запуск сервера (оставляем как есть)
 console.log("Запуск сервера...");
 app.listen(PORT, () => {
-  console.log(`--- Сервер успешно запущен на порту ${PORT} ---`); // Финальное сообщение
+  console.log(`--- Сервер УСПЕШНО запущен (БЕЗ catch-all) на порту ${PORT} ---`); // Обновили лог
 });
-console.log("Вызов app.listen() завершен."); // Этот лог может появиться до того, как сервер реально начнет слушать
+console.log("Вызов app.listen() завершен.");
