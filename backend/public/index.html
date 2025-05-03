@@ -14,31 +14,20 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <style>
-        /* Базовые стили в духе Apple */
-        body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            background-color: #ffffff; /* Чистый белый фон */
-            color: #1d1d1f; /* Основной цвет текста Apple */
-            -webkit-font-smoothing: antialiased;
-            -moz-osx-font-smoothing: grayscale;
-        }
-        .container { max-width: 1100px; }
-        #map { height: 450px; border-radius: 1rem; background-color: #e5e5e7; } /* Added bg color for loading state */
 
-        /* Навигация */
+    <style>
+        /* Стили остаются теми же, что и ранее, но добавим стили для новых секций */
+        body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background-color: #ffffff; color: #1d1d1f; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+        .container { max-width: 1100px; }
+        #map { height: 450px; border-radius: 1rem; background-color: #e5e5e7; z-index: 0;} /* Ensure map is behind popups/modals if needed */
         .tab-active { color: #007aff; border-bottom: 2px solid #007aff; font-weight: 600; padding-bottom: 8px; }
         .tab:not(.tab-active) { color: #515154; padding-bottom: 8px; }
         .tab:hover { color: #007aff; }
-
-        /* Сообщения */
         .message-box { position: fixed; bottom: 25px; right: 25px; padding: 0.8rem 1.3rem; border-radius: 0.75rem; color: white; z-index: 1000; display: none; max-width: 380px; box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15); opacity: 0; transform: translateY(15px); transition: opacity 0.35s ease-out, transform 0.35s ease-out; font-size: 0.9rem; font-weight: 500; }
         .message-box.show { display: block; opacity: 1; transform: translateY(0); }
         .message-box.success { background-color: #34c759; }
         .message-box.error { background-color: #ff3b30; }
         .message-box.info { background-color: #007aff; }
-
-        /* Выбор языка */
         .lang-dropdown { position: relative; display: inline-block; }
         .lang-dropdown-content { display: none; position: absolute; right: 0; background-color: rgba(255, 255, 255, 0.98); backdrop-filter: blur(10px); min-width: 120px; box-shadow: 0px 10px 25px rgba(0,0,0,0.1); z-index: 10; border-radius: 0.75rem; border: 1px solid rgba(0, 0, 0, 0.08); overflow: hidden; }
         .lang-dropdown-content button { color: #1d1d1f; padding: 10px 15px; text-decoration: none; display: block; width: 100%; text-align: left; background: none; border: none; cursor: pointer; font-size: 0.9rem; transition: background-color 0.15s ease-in-out; }
@@ -46,46 +35,30 @@
         .lang-dropdown:hover .lang-dropdown-content { display: block; }
         .lang-button { background-color: #f5f5f7; color: #1d1d1f; border: none; padding: 8px 12px; border-radius: 999px; transition: background-color 0.2s ease; cursor: pointer; }
         .lang-button:hover { background-color: #e5e5e7; }
-
-        /* Анимация секций */
         .content-section { transition: opacity 0.6s ease-in-out, transform 0.6s ease-in-out; }
-        .content-section.hidden { opacity: 0; height: 0; overflow: hidden; padding: 0 !important; margin: 0 !important; border: none !important; transform: translateY(20px); pointer-events: none; /* Prevent interaction when hidden */ }
-        .content-section:not(.hidden) { transform: translateY(0); }
-
-        /* Иконки (встроенные или через SVG/JS) */
+        .content-section.hidden { opacity: 0; max-height: 0; overflow: hidden; padding-top: 0 !important; padding-bottom: 0 !important; margin-top: 0 !important; margin-bottom: 0 !important; border: none !important; transform: translateY(20px); pointer-events: none; } /* Adjusted hidden style */
+        .content-section:not(.hidden) { transform: translateY(0); max-height: none; /* Or a large value like 1000vh */ }
         .icon { display: inline-block; width: 1.1em; height: 1.1em; margin-right: 0.4em; vertical-align: -0.15em; }
         .icon-lg { width: 1.5em; height: 1.5em; margin-right: 0.5em; vertical-align: -0.25em; }
-        .icon-xl { width: 2.5em; height: 2.5em; margin-bottom: 0.5rem; color: #007aff; } /* Example color */
-
-        /* Лендинг */
+        .icon-xl { width: 2.5em; height: 2.5em; margin-bottom: 0.5rem; color: #007aff; }
         .landing-hero { padding: 6rem 1rem; background-color: #f5f5f7; text-align: center; }
-        .landing-hero h1 { font-size: 2.8rem; font-weight: 700; line-height: 1.1; color: #1d1d1f; margin-bottom: 1rem; }
-        @media (min-width: 768px) { .landing-hero h1 { font-size: 4rem; } }
-        .landing-hero p { font-size: 1.1rem; color: #515154; max-width: 650px; margin: 0 auto 2rem auto; line-height: 1.5; }
-        @media (min-width: 768px) { .landing-hero p { font-size: 1.3rem; } }
+        .landing-hero h1 { font-size: 2.8rem; font-weight: 700; line-height: 1.1; color: #1d1d1f; margin-bottom: 1rem; } @media (min-width: 768px) { .landing-hero h1 { font-size: 4rem; } }
+        .landing-hero p { font-size: 1.1rem; color: #515154; max-width: 650px; margin: 0 auto 2rem auto; line-height: 1.5; } @media (min-width: 768px) { .landing-hero p { font-size: 1.3rem; } }
         .feature-card { background-color: #ffffff; border: 1px solid #e5e5e7; padding: 2rem; border-radius: 1rem; text-align: center; transition: transform 0.2s ease-out, box-shadow 0.2s ease-out; }
         .feature-card:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0, 0, 0, 0.08); }
         .feature-card h3 { font-size: 1.2rem; font-weight: 600; margin-bottom: 0.5rem; color: #1d1d1f; }
         .feature-card p { font-size: 0.95rem; color: #515154; line-height: 1.6; }
         .btn { display: inline-flex; align-items: center; justify-content: center; padding: 12px 24px; border-radius: 999px; font-weight: 600; font-size: 0.95rem; cursor: pointer; transition: background-color 0.2s ease, color 0.2s ease, transform 0.1s ease; border: none; text-decoration: none; }
-        .btn:active { transform: scale(0.98); }
-        .btn:disabled { background-color: #d1d1d6; cursor: not-allowed; opacity: 0.7; } /* Disabled state */
-        .btn-primary { background-color: #007aff; color: white; }
-        .btn-primary:hover:not(:disabled) { background-color: #0071e3; }
-        .btn-secondary { background-color: #e5e5e7; color: #1d1d1f; }
-        .btn-secondary:hover:not(:disabled) { background-color: #d1d1d6; }
-        .landing-section { padding: 4rem 1rem; border-bottom: 1px solid #e5e5e7; }
-        .landing-section:last-child { border-bottom: none; }
-        .landing-section h2 { font-size: 2rem; font-weight: 700; text-align: center; margin-bottom: 3rem; color: #1d1d1f; }
-        @media (min-width: 768px) { .landing-section h2 { font-size: 2.8rem; margin-bottom: 4rem;} }
+        .btn:active { transform: scale(0.98); } .btn:disabled { background-color: #d1d1d6; cursor: not-allowed; opacity: 0.7; }
+        .btn-primary { background-color: #007aff; color: white; } .btn-primary:hover:not(:disabled) { background-color: #0071e3; }
+        .btn-secondary { background-color: #e5e5e7; color: #1d1d1f; } .btn-secondary:hover:not(:disabled) { background-color: #d1d1d6; }
+        .landing-section { padding: 4rem 1rem; border-bottom: 1px solid #e5e5e7; } .landing-section:last-child { border-bottom: none; }
+        .landing-section h2 { font-size: 2rem; font-weight: 700; text-align: center; margin-bottom: 3rem; color: #1d1d1f; } @media (min-width: 768px) { .landing-section h2 { font-size: 2.8rem; margin-bottom: 4rem;} }
         .step-card { background-color: white; border: 1px solid #e5e5e7; padding: 1.5rem; border-radius: 1rem; text-align: center; }
         .step-number { display: inline-block; width: 40px; height: 40px; line-height: 40px; border-radius: 50%; background-color: #007aff; color: white; font-weight: 600; font-size: 1.1rem; margin-bottom: 1rem; }
-        .step-card h3 { font-weight: 600; margin-bottom: 0.5rem; }
-        .step-card p { font-size: 0.9rem; color: #515154; }
-        .img-placeholder { background-color: #e5e5e7; border-radius: 1rem; display: flex; align-items: center; justify-content: center; color: #8a8a8e; font-size: 0.9rem; overflow: hidden; min-height: 150px; /* Ensure minimum height */ }
+        .step-card h3 { font-weight: 600; margin-bottom: 0.5rem; } .step-card p { font-size: 0.9rem; color: #515154; }
+        .img-placeholder { background-color: #e5e5e7; border-radius: 1rem; display: flex; align-items: center; justify-content: center; color: #8a8a8e; font-size: 0.9rem; overflow: hidden; min-height: 150px; }
         .img-placeholder img { width: 100%; height: 100%; object-fit: cover; }
-
-        /* Карточки списков */
         .list-card { background-color: #ffffff; border: 1px solid #e5e5e7; border-radius: 1rem; padding: 1.5rem; margin-bottom: 1rem; transition: box-shadow 0.2s ease; }
         .list-card:hover { box-shadow: 0 5px 15px rgba(0, 0, 0, 0.07); }
         .list-card h3 { font-size: 1.1rem; font-weight: 600; color: #1d1d1f; margin-bottom: 0.5rem; }
@@ -93,26 +66,24 @@
         .list-card p, .list-card li { font-size: 0.9rem; color: #515154; line-height: 1.5; }
         .list-card .font-medium { color: #1d1d1f; font-weight: 500; }
         .report-card-meta { font-size: 0.8rem; color: #8a8a8e; margin-top: 0.75rem; border-top: 1px solid #f5f5f7; padding-top: 0.75rem; }
-        .report-card-meta span { margin-right: 1rem; display: inline-flex; align-items: center; } /* Better alignment */
+        .report-card-meta span { margin-right: 1rem; display: inline-flex; align-items: center; }
         .report-card-meta .icon { width: 0.9em; height: 0.9em; margin-right: 0.25em; vertical-align: -0.1em;}
-
-        /* Формы */
         label { font-weight: 500; color: #1d1d1f; margin-bottom: 0.5rem; display: block;}
-        input[type="text"], input[type="file"], select, textarea { background-color: #f5f5f7; border: 1px solid #d1d1d6; border-radius: 0.75rem; padding: 12px 15px; font-size: 0.95rem; color: #1d1d1f; width: 100%; transition: border-color 0.2s ease, box-shadow 0.2s ease; box-sizing: border-box; /* Include padding and border in element's total width and height */ }
-        input[type="text"]:focus, select:focus, textarea:focus { outline: none; border-color: #007aff; box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.2); }
+        input[type="text"], input[type="password"], input[type="email"], input[type="file"], select, textarea { background-color: #f5f5f7; border: 1px solid #d1d1d6; border-radius: 0.75rem; padding: 12px 15px; font-size: 0.95rem; color: #1d1d1f; width: 100%; transition: border-color 0.2s ease, box-shadow 0.2s ease; box-sizing: border-box; }
+        input[type="text"]:focus, input[type="password"]:focus, input[type="email"]:focus, select:focus, textarea:focus { outline: none; border-color: #007aff; box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.2); }
         input[type="file"] { padding: 8px 10px; cursor: pointer; }
-         input[type="file"]::file-selector-button {
-             margin-right: 1rem; padding: 6px 12px; border-radius: 0.5rem; background-color: #e5e5e7; border: none; color: #1d1d1f; cursor: pointer; transition: background-color 0.2s; font-weight: 500; font-size: 0.85rem;}
-         input[type="file"]::file-selector-button:hover { background-color: #d1d1d6;}
+        input[type="file"]::file-selector-button { margin-right: 1rem; padding: 6px 12px; border-radius: 0.5rem; background-color: #e5e5e7; border: none; color: #1d1d1f; cursor: pointer; transition: background-color 0.2s; font-weight: 500; font-size: 0.85rem;}
+        input[type="file"]::file-selector-button:hover { background-color: #d1d1d6;}
         input::placeholder, textarea::placeholder { color: #8a8a8e; }
-         /* Style for select arrow */
-         select { appearance: none; -webkit-appearance: none; -moz-appearance: none; background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="%23515154"><path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" /></svg>'); background-repeat: no-repeat; background-position: right 0.75rem center; background-size: 1.2em 1.2em; padding-right: 2.5rem; }
-
-        /* Подвал */
+        select { appearance: none; -webkit-appearance: none; -moz-appearance: none; background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="%23515154"><path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" /></svg>'); background-repeat: no-repeat; background-position: right 0.75rem center; background-size: 1.2em 1.2em; padding-right: 2.5rem; }
         footer { background-color: #f5f5f7; color: #515154; padding: 2rem 1rem; font-size: 0.85rem; margin-top: 4rem; }
-
-        /* Break word in comments */
         .break-words { word-wrap: break-word; overflow-wrap: break-word; }
+        /* Styles for Quiz/Register sections (simple centered box) */
+        .modal-section { max-width: 500px; margin-left: auto; margin-right: auto; background-color: white; padding: 2rem; border-radius: 1rem; box-shadow: 0 10px 25px rgba(0,0,0,0.1); border: 1px solid #e5e5e7; }
+        .quiz-option label { display: flex; align-items: center; padding: 0.75rem; border: 1px solid #e5e5e7; border-radius: 0.75rem; cursor: pointer; transition: background-color 0.2s, border-color 0.2s; margin-bottom: 0.75rem;}
+        .quiz-option input[type="radio"] { margin-right: 0.75rem; }
+        .quiz-option label:hover { background-color: #f5f5f7; }
+        .quiz-option input[type="radio"]:checked + span { font-weight: 600; color:#007aff; }
 
     </style>
 </head>
@@ -133,14 +104,13 @@
                 <button onclick="showSection('report-section', true)" class="tab text-sm" data-section="report-section" data-lang-key="nav_report">Сообщить</button>
             </div>
 
-            <div class="flex items-center">
-                <div class="lang-dropdown">
+            <div class="flex items-center space-x-3">
+                <button onclick="/* showLoginForm() - Add later */" class="btn btn-secondary btn-sm py-1.5 px-4 text-xs" data-lang-key="nav_login">Вход</button>
+                <button onclick="startRegistrationProcess()" class="btn btn-primary btn-sm py-1.5 px-4 text-xs" data-lang-key="nav_register">Регистрация</button>
+
+                <div class="lang-dropdown ml-2">
                     <button class="lang-button inline-flex items-center justify-center text-sm font-medium">
-                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 mr-1.5">
-                             <path d="M7.75 2.75a.75.75 0 00-1.5 0v1.258a32.987 32.987 0 00-3.599.278.75.75 0 10.198 1.487A31.545 31.545 0 018.7 5.546.75.75 0 009 6.75v1.476c0 .698-.373 1.33-.955 1.688a18.69 18.69 0 00-1.966.83.75.75 0 10.593 1.331 17.192 17.192 0 012.328-.853.75.75 0 00.701-.031 17.194 17.194 0 012.328.853.75.75 0 10.593-1.331 18.683 18.683 0 00-1.965-.83C11.373 9.555 11 8.917 11 8.226V6.75a.75.75 0 00-.3-.606A31.545 31.545 0 0114.802 5.77a.75.75 0 10.198-1.487 32.987 32.987 0 00-3.599-.278V2.75z" />
-                             <path fill-rule="evenodd" d="M13 10.5a2.75 2.75 0 10-5.5 0 2.75 2.75 0 005.5 0zM10 12a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd" />
-                             <path d="M10 18a8 8 0 100-16 8 8 0 000 16zm0 1.5a9.5 9.5 0 100-19 9.5 9.5 0 000 19z" />
-                         </svg>
+                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 mr-1.5"><path d="M7.75 2.75a.75.75 0 00-1.5 0v1.258a32.987 32.987 0 00-3.599.278.75.75 0 10.198 1.487A31.545 31.545 0 018.7 5.546.75.75 0 009 6.75v1.476c0 .698-.373 1.33-.955 1.688a18.69 18.69 0 00-1.966.83.75.75 0 10.593 1.331 17.192 17.192 0 012.328-.853.75.75 0 00.701-.031 17.194 17.194 0 012.328.853.75.75 0 10.593-1.331 18.683 18.683 0 00-1.965-.83C11.373 9.555 11 8.917 11 8.226V6.75a.75.75 0 00-.3-.606A31.545 31.545 0 0114.802 5.77a.75.75 0 10.198-1.487 32.987 32.987 0 00-3.599-.278V2.75z" /><path fill-rule="evenodd" d="M13 10.5a2.75 2.75 0 10-5.5 0 2.75 2.75 0 005.5 0zM10 12a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd" /><path d="M10 18a8 8 0 100-16 8 8 0 000 16zm0 1.5a9.5 9.5 0 100-19 9.5 9.5 0 000 19z" /></svg>
                         <span id="current-lang">RU</span>
                     </button>
                     <div class="lang-dropdown-content">
@@ -149,423 +119,237 @@
                         <button onclick="setLanguage('uz')">O'zbekcha (UZ)</button>
                     </div>
                 </div>
-                <button id="mobile-menu-button" class="ml-3 md:hidden p-2 rounded-md text-gray-600 hover:text-gray-900 hover:bg-gray-100">
+                <button id="mobile-menu-button" class="ml-1 md:hidden p-2 rounded-md text-gray-600 hover:text-gray-900 hover:bg-gray-100">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"></path></svg>
                 </button>
             </div>
         </nav>
         <div id="mobile-menu" class="hidden md:hidden bg-white border-t border-gray-200">
             <div class="px-2 pt-2 pb-3 space-y-1 sm:px-3">
-                 <button onclick="showSection('landing-section', true); closeMobileMenu();" class="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50" data-section="landing-section" data-lang-key="nav_home">Главная</button>
+                <button onclick="showSection('landing-section', true); closeMobileMenu();" class="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50" data-section="landing-section" data-lang-key="nav_home">Главная</button>
                 <button onclick="showSection('map-section', true); closeMobileMenu();" class="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50" data-section="map-section" data-lang-key="nav_map">Карта</button>
                 <button onclick="showSection('projects-section', true); closeMobileMenu();" class="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50" data-section="projects-section" data-lang-key="nav_projects">Проекты</button>
                 <button onclick="showSection('contractors-section', true); closeMobileMenu();" class="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50" data-section="contractors-section" data-lang-key="nav_contractors">Подрядчики</button>
                 <button onclick="showSection('citizen-reports-public-section', true); closeMobileMenu();" class="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50" data-section="citizen-reports-public-section" data-lang-key="nav_public_reports">Отчеты</button>
                 <button onclick="showSection('report-section', true); closeMobileMenu();" class="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50" data-section="report-section" data-lang-key="nav_report">Сообщить</button>
+                <div class="border-t border-gray-100 pt-3 mt-2 space-y-1">
+                     <button onclick="/* showLoginForm() - Add later */ closeMobileMenu();" class="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50" data-lang-key="nav_login">Вход</button>
+                     <button onclick="startRegistrationProcess(); closeMobileMenu();" class="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50" data-lang-key="nav_register">Регистрация</button>
+                 </div>
             </div>
         </div>
     </header>
 
-    <main class="container mx-auto px-4 sm:px-6 lg:px-8 pt-4">
+    <main class="container mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-8"> <section id="landing-section" class="content-section">
+            <div class="landing-hero rounded-xl mb-12 md:mb-16"><h1 data-lang-key="landing_title">Контролируйте строительство. Вместе.</h1><p data-lang-key="landing_subtitle">Платформа "Jamoatchilik Qurilish" — ваш инструмент для прозрачного мониторинга государственных инфраструктурных проектов в Узбекистане. Узнавайте бюджеты, следите за сроками и влияйте на качество.</p><div class="flex flex-col sm:flex-row justify-center items-center space-y-3 sm:space-y-0 sm:space-x-4"><button onclick="showSection('projects-section', true)" class="btn btn-primary w-full sm:w-auto"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="icon w-5 h-5"><path d="M3.5 2.75a.75.75 0 00-1.5 0v14.5a.75.75 0 001.5 0v-1.668A3.75 3.75 0 016.25 12h7.5a3.75 3.75 0 012.75 3.082V17.25a.75.75 0 001.5 0V2.75a.75.75 0 00-1.5 0v1.668A3.75 3.75 0 0113.75 8h-7.5a3.75 3.75 0 01-2.75-3.082V2.75z"></path></svg><span data-lang-key="landing_cta_projects">Изучить проекты</span></button><button onclick="showSection('report-section', true)" class="btn btn-secondary w-full sm:w-auto"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="icon w-5 h-5"><path fill-rule="evenodd" d="M10.868 2.884c-.321-.772-1.415-.772-1.736 0l-1.83 4.401-4.753.381c-.833.067-1.171 1.107-.536 1.651l3.62 3.102-1.106 4.637c-.194.813.691 1.456 1.405 1.02L10 15.591l4.069 2.485c.713.436 1.598-.207 1.404-1.02l-1.106-4.637 3.62-3.102c.635-.544.297-1.584-.536-1.65l-4.752-.382-1.831-4.401z" clip-rule="evenodd"></path></svg><span data-lang-key="landing_cta_report">Сообщить о проблеме</span></button></div></div>
+             <div class="landing-section"><h2 data-lang-key="landing_how_it_works_title">Как это работает? Просто.</h2><div class="grid grid-cols-1 md:grid-cols-3 gap-8"><div class="step-card"><span class="step-number">1</span><h3 data-lang-key="landing_how_step1_title">Находите проекты</h3><p data-lang-key="landing_how_step1_desc">Используйте интерактивную карту или список для поиска строящихся или завершенных объектов рядом с вами.</p></div><div class="step-card"><span class="step-number">2</span><h3 data-lang-key="landing_how_step2_title">Изучайте детали</h3><p data-lang-key="landing_how_step2_desc">Получите доступ к информации о бюджете, сроках, подрядчике и официальной документации по каждому проекту.</p></div><div class="step-card"><span class="step-number">3</span><h3 data-lang-key="landing_how_step3_title">Делитесь наблюдениями</h3><p data-lang-key="landing_how_step3_desc">Заметили проблему? Отправьте фото или комментарий с геолокацией прямо через платформу.</p></div></div></div>
+             <div class="landing-section bg-gray-50 rounded-xl"><h2 data-lang-key="landing_features_title">Ключевые возможности</h2><div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8"><div class="feature-card bg-white"><img src="/images/transparency-icon.png" class="icon-xl mx-auto" alt="Transparency Icon"><h3 data-lang-key="landing_feature1_title">Полная прозрачность</h3><p data-lang-key="landing_feature1_desc">Вся информация о бюджетах, сроках, подрядчиках и документации в одном месте.</p></div><div class="feature-card bg-white"><img src="/images/monitoring-icon.png" class="icon-xl mx-auto" alt="Monitoring Icon"><h3 data-lang-key="landing_feature2_title">Гражданский мониторинг</h3><p data-lang-key="landing_feature2_desc">Возможность для каждого гражданина сообщать о реальном состоянии объектов.</p></div><div class="feature-card bg-white"><img src="/images/ai-icon.png" class="icon-xl mx-auto" alt="AI Analysis Icon"><h3 data-lang-key="landing_feature3_title">AI-анализ отчетов</h3><p data-lang-key="landing_feature3_desc">Система анализирует данные от граждан и сравнивает их с официальными отчетами для выявления расхождений.</p></div><div class="feature-card bg-white"><img src="/images/rating-icon.png" class="icon-xl mx-auto" alt="Rating Icon"><h3 data-lang-key="landing_feature4_title">Рейтинг подрядчиков</h3><p data-lang-key="landing_feature4_desc">Публичный рейтинг компаний, основанный на качестве работ и отзывах граждан.</p></div></div></div>
+             <div class="landing-section"><h2 data-lang-key="landing_benefits_title">Польза для всех</h2><div class="grid grid-cols-1 md:grid-cols-2 gap-12 items-center"><div><h3 class="text-xl font-semibold mb-4" data-lang-key="landing_benefits_citizens_title">Для Граждан</h3><ul class="space-y-3 text-gray-600"><li class="flex items-start"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 text-green-500 mr-2 mt-0.5 flex-shrink-0"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd"></path></svg><span data-lang-key="landing_benefits_citizens1">Реальный контроль за расходованием бюджетных средств.</span></li><li class="flex items-start"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 text-green-500 mr-2 mt-0.5 flex-shrink-0"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd"></path></svg><span data-lang-key="landing_benefits_citizens2">Возможность влиять на качество инфраструктуры в своем городе.</span></li><li class="flex items-start"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 text-green-500 mr-2 mt-0.5 flex-shrink-0"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd"></path></svg><span data-lang-key="landing_benefits_citizens3">Удобный инструмент для обратной связи и сообщений о проблемах.</span></li></ul></div><div class="img-placeholder h-64 md:h-80"><img src="/images/citizen-feedback.jpg" alt="Гражданин использует платформу" loading="lazy"></div><div class="img-placeholder h-64 md:h-80 order-last md:order-first"><img src="/images/gov-analysis.jpg" alt="Анализ данных для государства" loading="lazy"></div><div class="order-first md:order-last"><h3 class="text-xl font-semibold mb-4" data-lang-key="landing_benefits_gov_title">Для Государства</h3><ul class="space-y-3 text-gray-600"><li class="flex items-start"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 text-green-500 mr-2 mt-0.5 flex-shrink-0"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd"></path></svg><span data-lang-key="landing_benefits_gov1">Повышение эффективности расходования бюджетных средств.</span></li><li class="flex items-start"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 text-green-500 mr-2 mt-0.5 flex-shrink-0"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd"></path></svg><span data-lang-key="landing_benefits_gov2">Своевременное выявление проблемных объектов и недобросовестных подрядчиков.</span></li><li class="flex items-start"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 text-green-500 mr-2 mt-0.5 flex-shrink-0"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd"></path></svg><span data-lang-key="landing_benefits_gov3">Улучшение качества инфраструктуры и повышение доверия граждан.</span></li></ul></div></div></div>
+             <div class="text-center py-12"><h2 class="text-2xl md:text-3xl font-bold mb-4" data-lang-key="landing_final_cta_title">Присоединяйтесь к контролю!</h2><p class="text-gray-600 mb-8 max-w-xl mx-auto" data-lang-key="landing_final_cta_desc">Начните использовать платформу уже сегодня. Изучайте проекты в вашем районе или сообщите о проблеме, которую вы заметили.</p><div class="flex flex-col sm:flex-row justify-center items-center space-y-3 sm:space-y-0 sm:space-x-4"><button onclick="showSection('map-section', true)" class="btn btn-primary w-full sm:w-auto"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="icon w-5 h-5"><path fill-rule="evenodd" d="M9.69 18.933l.003.001C9.89 19.02 10 19 10 19s.11.02.308-.066l.002-.001.006-.003.018-.008a5.741 5.741 0 00.281-.14c.186-.096.446-.24.757-.433.62-.384 1.445-.966 2.274-1.765C15.302 14.988 17 12.493 17 9A7 7 0 103 9c0 3.492 1.698 5.988 3.355 7.584a13.731 13.731 0 002.274 1.765 11.842 11.842 0 00.757.433c.1.049.194.096.28.14l.018.008.006.003zM10 11.25a2.25 2.25 0 100-4.5 2.25 2.25 0 000 4.5z" clip-rule="evenodd"></path></svg><span data-lang-key="landing_final_cta_map">Посмотреть карту</span></button><button onclick="showSection('report-section', true)" class="btn btn-secondary w-full sm:w-auto"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="icon w-5 h-5"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a.75.75 0 000 1.5h.253a.25.25 0 01.244.304l-.459 2.066A.75.75 0 0010 13.5h.253a.25.25 0 01.244.304l-.459 2.066A.75.75 0 0010 16.5h.75a.75.75 0 000-1.5h-.528a.25.25 0 01-.244-.304l.459-2.066A.75.75 0 0011 10.5h-.75a.75.75 0 000-1.5H9z" clip-rule="evenodd"></path></svg><span data-lang-key="landing_final_cta_report">Сообщить о проблеме</span></button></div></div>
+        </section>
 
-        <section id="landing-section" class="content-section">
-            <div class="landing-hero rounded-xl mb-12 md:mb-16">
-                <h1 data-lang-key="landing_title">Контролируйте строительство. Вместе.</h1>
-                <p data-lang-key="landing_subtitle">Платформа "Jamoatchilik Qurilish" — ваш инструмент для прозрачного мониторинга государственных инфраструктурных проектов в Узбекистане. Узнавайте бюджеты, следите за сроками и влияйте на качество.</p>
-                <div class="flex flex-col sm:flex-row justify-center items-center space-y-3 sm:space-y-0 sm:space-x-4">
-                    <button onclick="showSection('projects-section', true)" class="btn btn-primary w-full sm:w-auto" data-lang-key="landing_cta_projects">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="icon w-5 h-5"><path d="M3.5 2.75a.75.75 0 00-1.5 0v14.5a.75.75 0 001.5 0v-1.668A3.75 3.75 0 016.25 12h7.5a3.75 3.75 0 012.75 3.082V17.25a.75.75 0 001.5 0V2.75a.75.75 0 00-1.5 0v1.668A3.75 3.75 0 0113.75 8h-7.5a3.75 3.75 0 01-2.75-3.082V2.75z"></path></svg>
-                        Изучить проекты
-                    </button>
-                    <button onclick="showSection('report-section', true)" class="btn btn-secondary w-full sm:w-auto" data-lang-key="landing_cta_report">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="icon w-5 h-5"><path fill-rule="evenodd" d="M10.868 2.884c-.321-.772-1.415-.772-1.736 0l-1.83 4.401-4.753.381c-.833.067-1.171 1.107-.536 1.651l3.62 3.102-1.106 4.637c-.194.813.691 1.456 1.405 1.02L10 15.591l4.069 2.485c.713.436 1.598-.207 1.404-1.02l-1.106-4.637 3.62-3.102c.635-.544.297-1.584-.536-1.65l-4.752-.382-1.831-4.401z" clip-rule="evenodd"></path></svg>
-                        Сообщить о проблеме
-                    </button>
-                </div>
-            </div>
-
-            <div class="landing-section">
-                <h2 data-lang-key="landing_how_it_works_title">Как это работает? Просто.</h2>
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-                    <div class="step-card">
-                        <span class="step-number">1</span>
-                        <h3 data-lang-key="landing_how_step1_title">Находите проекты</h3>
-                        <p data-lang-key="landing_how_step1_desc">Используйте интерактивную карту или список для поиска строящихся или завершенных объектов рядом с вами.</p>
-                    </div>
-                    <div class="step-card">
-                        <span class="step-number">2</span>
-                        <h3 data-lang-key="landing_how_step2_title">Изучайте детали</h3>
-                        <p data-lang-key="landing_how_step2_desc">Получите доступ к информации о бюджете, сроках, подрядчике и официальной документации по каждому проекту.</p>
-                    </div>
-                    <div class="step-card">
-                        <span class="step-number">3</span>
-                        <h3 data-lang-key="landing_how_step3_title">Делитесь наблюдениями</h3>
-                        <p data-lang-key="landing_how_step3_desc">Заметили проблему? Отправьте фото или комментарий с геолокацией прямо через платформу.</p>
-                    </div>
-                </div>
-            </div>
-
-            <div class="landing-section bg-gray-50 rounded-xl">
-                <h2 data-lang-key="landing_features_title">Ключевые возможности</h2>
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-                    <div class="feature-card bg-white">
-                         <img src="/images/transparency-icon.png" class="icon-xl mx-auto" alt="Transparency Icon">
-                        <h3 data-lang-key="landing_feature1_title">Полная прозрачность</h3>
-                        <p data-lang-key="landing_feature1_desc">Вся информация о бюджетах, сроках, подрядчиках и документации в одном месте.</p>
-                    </div>
-                    <div class="feature-card bg-white">
-                         <img src="/images/monitoring-icon.png" class="icon-xl mx-auto" alt="Monitoring Icon">
-                        <h3 data-lang-key="landing_feature2_title">Гражданский мониторинг</h3>
-                        <p data-lang-key="landing_feature2_desc">Возможность для каждого гражданина сообщать о реальном состоянии объектов.</p>
-                    </div>
-                    <div class="feature-card bg-white">
-                        <img src="/images/ai-icon.png" class="icon-xl mx-auto" alt="AI Analysis Icon">
-                        <h3 data-lang-key="landing_feature3_title">AI-анализ отчетов</h3>
-                        <p data-lang-key="landing_feature3_desc">Система анализирует данные от граждан и сравнивает их с официальными отчетами для выявления расхождений.</p>
-                    </div>
-                    <div class="feature-card bg-white">
-                        <img src="/images/rating-icon.png" class="icon-xl mx-auto" alt="Rating Icon">
-                        <h3 data-lang-key="landing_feature4_title">Рейтинг подрядчиков</h3>
-                        <p data-lang-key="landing_feature4_desc">Публичный рейтинг компаний, основанный на качестве работ и отзывах граждан.</p>
-                    </div>
-                </div>
-            </div>
-
-            <div class="landing-section">
-                <h2 data-lang-key="landing_benefits_title">Польза для всех</h2>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
-                    <div>
-                        <h3 class="text-xl font-semibold mb-4" data-lang-key="landing_benefits_citizens_title">Для Граждан</h3>
-                        <ul class="space-y-3 text-gray-600">
-                            <li class="flex items-start">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 text-green-500 mr-2 mt-0.5 flex-shrink-0"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd"></path></svg>
-                                <span data-lang-key="landing_benefits_citizens1">Реальный контроль за расходованием бюджетных средств.</span>
-                            </li>
-                            <li class="flex items-start">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 text-green-500 mr-2 mt-0.5 flex-shrink-0"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd"></path></svg>
-                                <span data-lang-key="landing_benefits_citizens2">Возможность влиять на качество инфраструктуры в своем городе.</span>
-                            </li>
-                            <li class="flex items-start">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 text-green-500 mr-2 mt-0.5 flex-shrink-0"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd"></path></svg>
-                                <span data-lang-key="landing_benefits_citizens3">Удобный инструмент для обратной связи и сообщений о проблемах.</span>
-                            </li>
-                        </ul>
-                    </div>
-                     <div class="img-placeholder h-64 md:h-80">
-                        <img src="/images/citizen-feedback.jpg" alt="Гражданин использует платформу для обратной связи" loading="lazy">
-                    </div>
-                     <div class="img-placeholder h-64 md:h-80 order-last md:order-first">
-                        <img src="/images/gov-analysis.jpg" alt="Графики анализа данных и отчеты" loading="lazy">
-                    </div>
-                    <div class="order-first md:order-last">
-                        <h3 class="text-xl font-semibold mb-4" data-lang-key="landing_benefits_gov_title">Для Государства</h3>
-                        <ul class="space-y-3 text-gray-600">
-                            <li class="flex items-start">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 text-green-500 mr-2 mt-0.5 flex-shrink-0"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd"></path></svg>
-                                <span data-lang-key="landing_benefits_gov1">Повышение эффективности расходования бюджетных средств.</span>
-                            </li>
-                            <li class="flex items-start">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 text-green-500 mr-2 mt-0.5 flex-shrink-0"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd"></path></svg>
-                                <span data-lang-key="landing_benefits_gov2">Своевременное выявление проблемных объектов и недобросовестных подрядчиков.</span>
-                            </li>
-                            <li class="flex items-start">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 text-green-500 mr-2 mt-0.5 flex-shrink-0"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd"></path></svg>
-                                <span data-lang-key="landing_benefits_gov3">Улучшение качества инфраструктуры и повышение доверия граждан.</span>
-                            </li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
-
-            <div class="text-center py-12">
-                <h2 class="text-2xl md:text-3xl font-bold mb-4" data-lang-key="landing_final_cta_title">Присоединяйтесь к контролю!</h2>
-                <p class="text-gray-600 mb-8 max-w-xl mx-auto" data-lang-key="landing_final_cta_desc">Начните использовать платформу уже сегодня. Изучайте проекты в вашем районе или сообщите о проблеме, которую вы заметили.</p>
-                <div class="flex flex-col sm:flex-row justify-center items-center space-y-3 sm:space-y-0 sm:space-x-4">
-                    <button onclick="showSection('map-section', true)" class="btn btn-primary w-full sm:w-auto" data-lang-key="landing_final_cta_map">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="icon w-5 h-5"><path fill-rule="evenodd" d="M9.69 18.933l.003.001C9.89 19.02 10 19 10 19s.11.02.308-.066l.002-.001.006-.003.018-.008a5.741 5.741 0 00.281-.14c.186-.096.446-.24.757-.433.62-.384 1.445-.966 2.274-1.765C15.302 14.988 17 12.493 17 9A7 7 0 103 9c0 3.492 1.698 5.988 3.355 7.584a13.731 13.731 0 002.274 1.765 11.842 11.842 0 00.757.433c.1.049.194.096.28.14l.018.008.006.003zM10 11.25a2.25 2.25 0 100-4.5 2.25 2.25 0 000 4.5z" clip-rule="evenodd"></path></svg>
-                        Посмотреть карту
-                    </button>
-                    <button onclick="showSection('report-section', true)" class="btn btn-secondary w-full sm:w-auto" data-lang-key="landing_final_cta_report">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="icon w-5 h-5"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a.75.75 0 000 1.5h.253a.25.25 0 01.244.304l-.459 2.066A.75.75 0 0010 13.5h.253a.25.25 0 01.244.304l-.459 2.066A.75.75 0 0010 16.5h.75a.75.75 0 000-1.5h-.528a.25.25 0 01-.244-.304l.459-2.066A.75.75 0 0011 10.5h-.75a.75.75 0 000-1.5H9z" clip-rule="evenodd"></path></svg>
-                        Сообщить о проблеме
-                    </button>
-                </div>
+        <section id="map-section" class="content-section hidden">
+            <div class="bg-white p-6 md:p-8 rounded-xl shadow-lg mb-8">
+                <h2 class="text-2xl md:text-3xl font-semibold mb-6 text-gray-800" data-lang-key="map_title">Интерактивная карта проектов</h2>
+                <div id="map" class="border border-gray-200 z-0"></div>
+                <p class="mt-4 text-sm text-gray-600" data-lang-key="map_hint">Нажмите на маркер для просмотра информации о проекте.</p>
             </div>
         </section>
 
-        <section id="map-section" class="content-section bg-white p-6 md:p-8 rounded-xl shadow-lg mb-8 hidden">
-            <h2 class="text-2xl md:text-3xl font-semibold mb-6 text-gray-800" data-lang-key="map_title">Интерактивная карта проектов</h2>
-            <div id="map" class="border border-gray-200"></div>
-            <p class="mt-4 text-sm text-gray-600" data-lang-key="map_hint">Нажмите на маркер для просмотра информации о проекте.</p>
-        </section>
-
-        <section id="projects-section" class="content-section bg-white p-6 md:p-8 rounded-xl shadow-lg mb-8 hidden">
-             <h2 class="text-2xl md:text-3xl font-semibold mb-6 text-gray-800" data-lang-key="projects_title">Список Инфраструктурных Проектов</h2>
-             <div class="mb-6 relative">
-                 <input type="text" id="project-search" data-lang-placeholder-key="projects_search_placeholder" placeholder="Поиск по названию или подрядчику..." class="w-full p-3 pl-10">
-                 <div class="absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none text-gray-400">
-                     <svg class="w-5 h-5 " xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
-                    </svg>
+        <section id="projects-section" class="content-section hidden">
+             <div class="bg-white p-6 md:p-8 rounded-xl shadow-lg mb-8">
+                 <h2 class="text-2xl md:text-3xl font-semibold mb-6 text-gray-800" data-lang-key="projects_title">Список Инфраструктурных Проектов</h2>
+                 <div class="mb-6 relative">
+                     <input type="text" id="project-search" data-lang-placeholder-key="projects_search_placeholder" placeholder="Поиск по названию или подрядчику..." class="w-full p-3 pl-10 text-sm">
+                     <div class="absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none text-gray-400"> <svg class="w-5 h-5 " xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" /></svg> </div>
                  </div>
-             </div>
-             <div id="project-list" class="space-y-4">
-                 <p class="text-gray-500 italic p-4" data-lang-key="projects_not_found">Проекты не найдены.</p>
-             </div>
-        </section>
-
-        <section id="contractors-section" class="content-section bg-white p-6 md:p-8 rounded-xl shadow-lg mb-8 hidden">
-             <h2 class="text-2xl md:text-3xl font-semibold mb-6 text-gray-800" data-lang-key="contractors_title">Рейтинг Подрядчиков</h2>
-             <div id="contractor-list" class="space-y-4">
-                 <p class="text-gray-500 italic p-4" data-lang-key="contractor_no_projects">Нет информации о подрядчиках.</p> </div>
-        </section>
-
-        <section id="citizen-reports-public-section" class="content-section bg-white p-6 md:p-8 rounded-xl shadow-lg mb-8 hidden">
-             <div class="flex flex-wrap justify-between items-center mb-6 gap-4">
-                 <h2 id="public-reports-title" class="text-2xl md:text-3xl font-semibold text-gray-800" data-lang-key="public_reports_title">Публичные отчеты граждан</h2>
-                 <button id="show-all-reports-button" class="btn btn-secondary hidden text-sm py-2 px-4" onclick="displayPublicReports(null)"> <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="icon w-4 h-4"><path fill-rule="evenodd" d="M15 8A7 7 0 111 8a7 7 0 0114 0zm-5.25-2.75A.75.75 0 008.5 4.5v3.25H5.25a.75.75 0 000 1.5h3.25V12a.75.75 0 001.5 0V9.25h3.25a.75.75 0 000-1.5H9.75V5.25a.75.75 0 00-.75-.75z" clip-rule="evenodd"></path></svg>
-                     <span data-lang-key="public_reports_show_all">Показать все отчеты</span>
-                 </button>
-             </div>
-             <div id="public-reports-list" class="space-y-4">
-                 <p class="text-gray-500 italic p-4" data-lang-key="report_no_reports">Пока нет отчетов.</p>
-             </div>
-        </section>
-
-        <section id="report-section" class="content-section bg-white p-6 md:p-8 rounded-xl shadow-lg mb-8 hidden">
-             <h2 class="text-2xl md:text-3xl font-semibold mb-2 text-gray-800" data-lang-key="report_title">Сообщить о состоянии объекта</h2>
-             <p class="text-gray-600 mb-6 text-sm" data-lang-key="report_subtitle">Заметили проблему со строительством или состоянием объекта? Расскажите нам!</p>
-             <form id="report-form" class="space-y-5" novalidate> <div>
-                     <label for="report-project" data-lang-key="report_select_project">Выберите проект:</label>
-                     <select id="report-project" name="project" required>
-                          <option value="" data-lang-key="report_select_placeholder" disabled selected>-- Выберите проект --</option>
-                         </select>
-                 </div>
-                 <div>
-                     <label for="report-comment" data-lang-key="report_comment_label">Ваш комментарий:</label>
-                     <textarea id="report-comment" name="comment" rows="4" data-lang-placeholder-key="report_comment_placeholder" placeholder="Опишите проблему..." required></textarea>
-                 </div>
-                 <div>
-                     <label for="report-photo" data-lang-key="report_attach_photo">Прикрепить фото:</label>
-                     <input type="file" id="report-photo" name="report-photo" accept="image/jpeg, image/png, image/gif, image/webp"> <p class="text-xs text-gray-500 mt-1" data-lang-key="report_attach_hint">Допустимые форматы: JPG, PNG, GIF, WEBP (макс. 10MB).</p>
-                 </div>
-                  <div>
-                     <label data-lang-key="report_geolocation_label">Геолокация:</label>
-                     <p id="geolocation-status" class="text-sm text-gray-600" data-lang-key="report_geolocation_fetching">Получение координат...</p>
-                     <input type="hidden" id="report-latitude" name="latitude">
-                     <input type="hidden" id="report-longitude" name="longitude">
-                 </div>
-                 <button type="submit" class="btn btn-primary w-full py-3">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="icon w-5 h-5"><path d="M3.105 3.105a1.5 1.5 0 012.122 0l11.06 11.061a1.5 1.5 0 01-2.122 2.121L3.105 5.227a1.5 1.5 0 010-2.122z"></path><path d="M3.474 15.026a1.5 1.5 0 010-2.121L14.534 1.84a1.5 1.5 0 012.121 2.122L5.596 15.026a1.5 1.5 0 01-2.122 0z"></path></svg>
-                     <span data-lang-key="report_submit_button">Отправить отчет</span>
-                 </button>
-             </form>
-
-             <div id="citizen-reports" class="mt-10 border-t border-gray-200 pt-6">
-                 <h3 class="text-xl font-semibold mb-4 text-gray-700" data-lang-key="report_latest_reports">Последние отчеты граждан:</h3>
-                 <div id="reports-list" class="space-y-4 max-h-96 overflow-y-auto pr-2"> <p class="text-gray-500 italic text-sm" data-lang-key="report_no_reports">Пока нет отчетов.</p>
+                 <div id="project-list" class="space-y-4">
+                     <p class="text-gray-500 italic p-4" data-lang-key="projects_not_found">Загрузка проектов...</p>
                  </div>
              </div>
         </section>
+
+        <section id="contractors-section" class="content-section hidden">
+             <div class="bg-white p-6 md:p-8 rounded-xl shadow-lg mb-8">
+                 <h2 class="text-2xl md:text-3xl font-semibold mb-6 text-gray-800" data-lang-key="contractors_title">Рейтинг Подрядчиков</h2>
+                 <div id="contractor-list" class="space-y-4">
+                      <p class="text-gray-500 italic p-4" data-lang-key="contractor_no_projects">Загрузка подрядчиков...</p>
+                 </div>
+             </div>
+        </section>
+
+        <section id="citizen-reports-public-section" class="content-section hidden">
+             <div class="bg-white p-6 md:p-8 rounded-xl shadow-lg mb-8">
+                 <div class="flex flex-wrap justify-between items-center mb-6 gap-4">
+                     <h2 id="public-reports-title" class="text-2xl md:text-3xl font-semibold text-gray-800" data-lang-key="public_reports_title">Публичные отчеты граждан</h2>
+                     <button id="show-all-reports-button" class="btn btn-secondary hidden text-sm py-2 px-4" onclick="displayPublicReports(null)">
+                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="icon w-4 h-4"><path fill-rule="evenodd" d="M4.5 2a.5.5 0 0 0-.5.5v11a.5.5 0 0 0 .5.5h7a.5.5 0 0 0 .5-.5v-11a.5.5 0 0 0-.5-.5h-7ZM5 13V3h6v10H5Z" clip-rule="evenodd" /><path d="M6.854 4.146a.5.5 0 0 1 0 .708L5.707 6l1.147 1.146a.5.5 0 0 1-.708.708L4.646 6.354a.5.5 0 0 1 0-.708L6.146 4.146a.5.5 0 0 1 .708 0Zm2.292 0a.5.5 0 0 0 0 .708L10.293 6l-1.147 1.146a.5.5 0 0 0 .708.708l1.5-1.5a.5.5 0 0 0 0-.708l-1.5-1.5a.5.5 0 0 0-.708 0Z"/></svg>
+                         <span data-lang-key="public_reports_show_all">Показать все отчеты</span>
+                     </button>
+                 </div>
+                 <div id="public-reports-list" class="space-y-4">
+                      <p class="text-gray-500 italic p-4" data-lang-key="report_no_reports">Загрузка отчетов...</p>
+                 </div>
+             </div>
+        </section>
+
+        <section id="report-section" class="content-section hidden">
+             <div class="bg-white p-6 md:p-8 rounded-xl shadow-lg mb-8">
+                 <h2 class="text-2xl md:text-3xl font-semibold mb-2 text-gray-800" data-lang-key="report_title">Сообщить о состоянии объекта</h2>
+                 <p class="text-gray-600 mb-6 text-sm" data-lang-key="report_subtitle">Заметили проблему со строительством или состоянием объекта? Расскажите нам!</p>
+                 <form id="report-form" class="space-y-5" novalidate>
+                     <div><label for="report-project" data-lang-key="report_select_project">Выберите проект:</label><select id="report-project" name="project" required><option value="" data-lang-key="report_select_placeholder" disabled selected>-- Выберите проект --</option></select></div>
+                     <div><label for="report-comment" data-lang-key="report_comment_label">Ваш комментарий:</label><textarea id="report-comment" name="comment" rows="4" data-lang-placeholder-key="report_comment_placeholder" placeholder="Опишите проблему..." required></textarea></div>
+                     <div><label for="report-photo" data-lang-key="report_attach_photo">Прикрепить фото:</label><input type="file" id="report-photo" name="report-photo" accept="image/jpeg, image/png, image/gif, image/webp"><p class="text-xs text-gray-500 mt-1" data-lang-key="report_attach_hint">Допустимые форматы: JPG, PNG, GIF, WEBP (макс. 10MB).</p></div>
+                     <div><label data-lang-key="report_geolocation_label">Геолокация:</label><p id="geolocation-status" class="text-sm text-gray-600" data-lang-key="report_geolocation_fetching">Получение координат...</p><input type="hidden" id="report-latitude" name="latitude"><input type="hidden" id="report-longitude" name="longitude"></div>
+                     <button type="submit" class="btn btn-primary w-full py-3"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="icon w-5 h-5"><path d="M3.105 3.105a1.5 1.5 0 012.122 0l11.06 11.061a1.5 1.5 0 01-2.122 2.121L3.105 5.227a1.5 1.5 0 010-2.122z"></path><path d="M3.474 15.026a1.5 1.5 0 010-2.121L14.534 1.84a1.5 1.5 0 012.121 2.122L5.596 15.026a1.5 1.5 0 01-2.122 0z"></path></svg><span data-lang-key="report_submit_button">Отправить отчет</span></button>
+                 </form>
+                 <div id="citizen-reports" class="mt-10 border-t border-gray-200 pt-6"><h3 class="text-xl font-semibold mb-4 text-gray-700" data-lang-key="report_latest_reports">Последние отчеты граждан:</h3><div id="reports-list" class="space-y-4 max-h-96 overflow-y-auto pr-2"><p class="text-gray-500 italic text-sm" data-lang-key="report_no_reports">Загрузка отчетов...</p></div></div>
+             </div>
+        </section>
+
+        <section id="quiz-section" class="content-section hidden">
+            <div class="modal-section"> <h2 class="text-2xl md:text-3xl font-semibold mb-6 text-gray-800 text-center" data-lang-key="quiz_title">Проверка знаний</h2>
+                <p class="text-gray-600 mb-6 text-sm text-center" data-lang-key="quiz_intro">Прежде чем вы сможете зарегистрироваться, пожалуйста, ответьте на несколько вопросов о платформе.</p>
+                <form id="quiz-form" class="space-y-6">
+                    <div id="quiz-questions-container">
+                        <p class="text-center text-gray-500" data-lang-key="quiz_loading">Загрузка вопросов...</p>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-full py-3" data-lang-key="quiz_submit_button">Отправить ответы</button>
+                </form>
+            </div>
+        </section>
+
+        <section id="register-section" class="content-section hidden">
+             <div class="modal-section">
+                 <h2 class="text-2xl md:text-3xl font-semibold mb-6 text-gray-800 text-center" data-lang-key="register_title">Регистрация</h2>
+                 <p class="text-gray-600 mb-6 text-sm text-center" data-lang-key="register_intro">Тест пройден! Теперь вы можете создать аккаунт.</p>
+                 <form id="register-form" class="space-y-5" novalidate>
+                     <div>
+                         <label for="register-email" data-lang-key="register_email_label">Email:</label>
+                         <input type="email" id="register-email" name="email" required data-lang-placeholder-key="register_email_placeholder" placeholder="Введите ваш email">
+                     </div>
+                      <div>
+                         <label for="register-password" data-lang-key="register_password_label">Пароль:</label>
+                         <input type="password" id="register-password" name="password" required data-lang-placeholder-key="register_password_placeholder" placeholder="Придумайте пароль">
+                     </div>
+                      <div>
+                         <label for="register-confirm-password" data-lang-key="register_confirm_password_label">Подтвердите пароль:</label>
+                         <input type="password" id="register-confirm-password" name="confirmPassword" required data-lang-placeholder-key="register_confirm_password_placeholder" placeholder="Повторите пароль">
+                     </div>
+                     <button type="submit" class="btn btn-primary w-full py-3" data-lang-key="register_submit_button">Зарегистрироваться</button>
+                 </form>
+             </div>
+        </section>
+
+         <section id="login-section" class="content-section hidden">
+             <div class="modal-section">
+                 <h2 class="text-2xl md:text-3xl font-semibold mb-6 text-gray-800 text-center" data-lang-key="login_title">Вход</h2>
+                 <p class="text-gray-600 mb-6 text-sm text-center" data-lang-key="login_intro">Введите ваши данные для входа.</p>
+                 </div>
+         </section>
 
     </main>
 
     <footer>
         <div class="container mx-auto px-4 sm:px-6 lg:px-8 text-center">
             <p>&copy; <span id="footer-year">2025</span> <span data-lang-key="platform_name_footer">Jamoatchilik Qurilish</span>. <span data-lang-key="footer_rights">Все права защищены.</span></p>
-            </div>
+        </div>
     </footer>
 
     <div id="message-box" class="message-box"></div>
 
     <script>
-        // --- ЯЗЫКОВЫЕ ДАННЫЕ (Дополнены) ---
+        // --- ЯЗЫКОВЫЕ ДАННЫЕ (Дополнены ключами для регистрации и теста) ---
         const languages = {
             ru: {
                 platform_title: "Jamoatchilik Qurilish - Гражданский Контроль",
                 platform_name: "Jamoatchilik Qurilish",
                 platform_name_footer: "Jamoatchilik Qurilish",
-                nav_home: "Главная",
-                nav_map: "Карта",
-                nav_projects: "Проекты",
-                nav_contractors: "Подрядчики",
-                nav_public_reports: "Отчеты",
-                nav_report: "Сообщить",
+                nav_home: "Главная", nav_map: "Карта", nav_projects: "Проекты", nav_contractors: "Подрядчики", nav_public_reports: "Отчеты", nav_report: "Сообщить",
+                nav_login: "Вход", // NEW
+                nav_register: "Регистрация", // NEW
                 landing_title: "Контролируйте строительство. Вместе.",
                 landing_subtitle: "Платформа \"Jamoatchilik Qurilish\" — ваш инструмент для прозрачного мониторинга государственных инфраструктурных проектов в Узбекистане. Узнавайте бюджеты, следите за сроками и влияйте на качество.",
-                landing_cta_projects: "Изучить проекты",
-                landing_cta_report: "Сообщить о проблеме",
-                landing_how_it_works_title: "Как это работает? Просто.",
-                landing_how_step1_title: "Находите проекты",
-                landing_how_step1_desc: "Используйте интерактивную карту или список для поиска строящихся или завершенных объектов рядом с вами.",
-                landing_how_step2_title: "Изучайте детали",
-                landing_how_step2_desc: "Получите доступ к информации о бюджете, сроках, подрядчике и официальной документации по каждому проекту.",
-                landing_how_step3_title: "Делитесь наблюдениями",
-                landing_how_step3_desc: "Заметили проблему? Отправьте фото или комментарий с геолокацией прямо через платформу.",
-                landing_features_title: "Ключевые возможности",
-                landing_feature1_title: "Полная прозрачность",
-                landing_feature1_desc: "Вся информация о бюджетах, сроках, подрядчиках и документации в одном месте.",
-                landing_feature2_title: "Гражданский мониторинг",
-                landing_feature2_desc: "Возможность для каждого гражданина сообщать о реальном состоянии объектов.",
-                landing_feature3_title: "AI-анализ отчетов",
-                landing_feature3_desc: "Система анализирует данные от граждан и сравнивает их с официальными отчетами для выявления расхождений.",
-                landing_feature4_title: "Рейтинг подрядчиков",
-                landing_feature4_desc: "Публичный рейтинг компаний, основанный на качестве работ и отзывах граждан.",
-                landing_benefits_title: "Польза для всех",
-                landing_benefits_citizens_title: "Для Граждан",
-                landing_benefits_citizens1: "Реальный контроль за расходованием бюджетных средств.",
-                landing_benefits_citizens2: "Возможность влиять на качество инфраструктуры в своем городе.",
-                landing_benefits_citizens3: "Удобный инструмент для обратной связи и сообщений о проблемах.",
-                landing_benefits_gov_title: "Для Государства",
-                landing_benefits_gov1: "Повышение эффективности расходования бюджетных средств.",
-                landing_benefits_gov2: "Своевременное выявление проблемных объектов и недобросовестных подрядчиков.",
-                landing_benefits_gov3: "Улучшение качества инфраструктуры и повышение доверия граждан.",
-                landing_final_cta_title: "Присоединяйтесь к контролю!",
-                landing_final_cta_desc: "Начните использовать платформу уже сегодня. Изучайте проекты в вашем районе или сообщите о проблеме, которую вы заметили.",
-                landing_final_cta_map: "Посмотреть карту",
-                landing_final_cta_report: "Сообщить о проблеме",
-                map_title: "Интерактивная карта проектов",
-                map_hint: "Нажмите на маркер для просмотра информации о проекте.",
-                map_popup_status: "Статус",
-                map_popup_budget: "Бюджет",
-                map_popup_deadline: "Срок",
-                map_popup_contractor: "Подрядчик",
-                map_popup_docs: "Документация",
-                map_popup_alert: "Внимание: Есть жалобы!",
-                projects_title: "Список Инфраструктурных Проектов",
-                projects_search_placeholder: "Поиск по названию или подрядчику...",
-                projects_not_found: "Проекты не найдены.",
-                project_status: "Статус",
-                project_budget: "Бюджет",
-                project_deadline: "Срок сдачи",
-                project_contractor: "Подрядчик",
-                project_rating: "Рейтинг",
-                project_official_report: "Официальный отчет",
-                project_docs_link: "Смотреть документацию",
-                project_alert_serious: "Обнаружены серьезные расхождения с отчетами граждан!",
-                project_alert_minor: "Поступили жалобы от граждан.",
-                project_show_on_map: "Показать на карте",
-                project_view_reports_link: "Посмотреть отчеты",
-                contractors_title: "Рейтинг Подрядчиков",
-                contractor_rating: "Рейтинг",
-                contractor_projects_completed: "Завершено проектов",
-                contractor_current_projects: "Текущие/завершенные проекты:",
-                contractor_no_projects: "Нет информации о проектах",
-                report_title: "Сообщить о состоянии объекта",
-                report_subtitle: "Заметили проблему со строительством или состоянием объекта? Расскажите нам!",
-                report_select_project: "Выберите проект:",
-                report_select_placeholder: "-- Выберите проект --",
-                report_comment_label: "Ваш комментарий:",
-                report_comment_placeholder: "Опишите проблему (например, 'дорогу отремонтировали месяц назад, а уже ямы')",
-                report_attach_photo: "Прикрепить фото:",
-                report_attach_hint: "Допустимые форматы: JPG, PNG, GIF, WEBP (макс. 10MB)",
-                report_geolocation_label: "Геолокация:",
-                report_geolocation_fetching: "Получение координат...",
-                report_geolocation_success: "Координаты получены",
-                report_geolocation_error: "Не удалось получить координаты. Отчет будет отправлен без них.",
-                report_geolocation_permission_denied: "Доступ к геолокации запрещен.",
-                report_geolocation_unavailable: "Информация о местоположении недоступна.",
-                report_geolocation_timeout: "Время ожидания запроса геолокации истекло.",
-                report_geolocation_unsupported: "Геолокация не поддерживается вашим браузером.",
-                report_submit_button: "Отправить отчет",
-                report_latest_reports: "Последние отчеты граждан:",
-                report_no_reports: "Пока нет отчетов.",
-                report_no_reports_for_project: "Нет отчетов для этого проекта.",
-                report_card_project: "Проект",
-                report_card_comment: "Комментарий",
-                report_card_date: "Дата",
-                report_card_photo: "Фото",
-                report_card_location: "Локация",
-                report_card_unknown_project: "Неизвестный проект",
-                public_reports_title: "Публичные отчеты граждан",
-                public_reports_title_filtered: "Отчеты по проекту: {projectName}",
-                public_reports_show_all: "Показать все отчеты",
-                message_success: "Ваш отчет успешно отправлен!",
-                message_error_form: "Пожалуйста, выберите проект и напишите комментарий.",
-                message_docs_simulation: "Симуляция открытия документа:",
-                footer_year: new Date().getFullYear(),
-                footer_rights: "Все права защищены.",
-                locale_code: "ru-RU", // For date formatting
-                'Loading reports...': 'Загрузка отчетов...',
-                'Submitting...': 'Отправка...',
-                'Error fetching data ({endpoint}): {message}': 'Ошибка загрузки данных ({endpoint}): {message}',
-                'Error: Invalid coordinates for this project.': 'Ошибка: Неверные координаты для этого проекта.',
-                'Error: Project not found.': 'Ошибка: Проект не найден.',
-                'Error: Map not loaded yet.': 'Ошибка: Карта еще не загружена.',
-                'Error: Project location data is missing or invalid.': 'Ошибка: Данные о местоположении проекта отсутствуют или неверны.',
-                'Error submitting report. Please try again.': 'Ошибка отправки отчета. Пожалуйста, попробуйте еще раз.',
-                'Failed to Load Application Data': 'Не удалось загрузить данные приложения',
-                'Please check your connection and refresh the page.': 'Пожалуйста, проверьте соединение и обновите страницу.',
-                'Unnamed Project': 'Проект без названия',
-                'Unnamed Contractor': 'Подрядчик без названия',
-                'No document specified': 'Документ не указан',
-                'No docs': 'Нет документов'
+                landing_cta_projects: "Изучить проекты", landing_cta_report: "Сообщить о проблеме",
+                landing_how_it_works_title: "Как это работает? Просто.", landing_how_step1_title: "Находите проекты", landing_how_step1_desc: "Используйте интерактивную карту или список для поиска строящихся или завершенных объектов рядом с вами.", landing_how_step2_title: "Изучайте детали", landing_how_step2_desc: "Получите доступ к информации о бюджете, сроках, подрядчике и официальной документации по каждому проекту.", landing_how_step3_title: "Делитесь наблюдениями", landing_how_step3_desc: "Заметили проблему? Отправьте фото или комментарий с геолокацией прямо через платформу.",
+                landing_features_title: "Ключевые возможности", landing_feature1_title: "Полная прозрачность", landing_feature1_desc: "Вся информация о бюджетах, сроках, подрядчиках и документации в одном месте.", landing_feature2_title: "Гражданский мониторинг", landing_feature2_desc: "Возможность для каждого гражданина сообщать о реальном состоянии объектов.", landing_feature3_title: "AI-анализ отчетов", landing_feature3_desc: "Система анализирует данные от граждан и сравнивает их с официальными отчетами для выявления расхождений.", landing_feature4_title: "Рейтинг подрядчиков", landing_feature4_desc: "Публичный рейтинг компаний, основанный на качестве работ и отзывах граждан.",
+                landing_benefits_title: "Польза для всех", landing_benefits_citizens_title: "Для Граждан", landing_benefits_citizens1: "Реальный контроль за расходованием бюджетных средств.", landing_benefits_citizens2: "Возможность влиять на качество инфраструктуры в своем городе.", landing_benefits_citizens3: "Удобный инструмент для обратной связи и сообщений о проблемах.", landing_benefits_gov_title: "Для Государства", landing_benefits_gov1: "Повышение эффективности расходования бюджетных средств.", landing_benefits_gov2: "Своевременное выявление проблемных объектов и недобросовестных подрядчиков.", landing_benefits_gov3: "Улучшение качества инфраструктуры и повышение доверия граждан.",
+                landing_final_cta_title: "Присоединяйтесь к контролю!", landing_final_cta_desc: "Начните использовать платформу уже сегодня. Изучайте проекты в вашем районе или сообщите о проблеме, которую вы заметили.", landing_final_cta_map: "Посмотреть карту", landing_final_cta_report: "Сообщить о проблеме",
+                map_title: "Интерактивная карта проектов", map_hint: "Нажмите на маркер для просмотра информации о проекте.", map_popup_status: "Статус", map_popup_budget: "Бюджет", map_popup_deadline: "Срок", map_popup_contractor: "Подрядчик", map_popup_docs: "Документация", map_popup_alert: "Внимание: Есть жалобы!",
+                projects_title: "Список Инфраструктурных Проектов", projects_search_placeholder: "Поиск по названию или подрядчику...", projects_not_found: "Проекты не найдены.", project_status: "Статус", project_budget: "Бюджет", project_deadline: "Срок сдачи", project_contractor: "Подрядчик", project_rating: "Рейтинг", project_official_report: "Официальный отчет", project_docs_link: "Смотреть документацию", project_alert_serious: "Обнаружены серьезные расхождения с отчетами граждан!", project_alert_minor: "Поступили жалобы от граждан.", project_show_on_map: "Показать на карте", project_view_reports_link: "Посмотреть отчеты",
+                contractors_title: "Рейтинг Подрядчиков", contractor_rating: "Рейтинг", contractor_projects_completed: "Завершено проектов", contractor_current_projects: "Текущие/завершенные проекты:", contractor_no_projects: "Нет информации о проектах",
+                report_title: "Сообщить о состоянии объекта", report_subtitle: "Заметили проблему со строительством или состоянием объекта? Расскажите нам!", report_select_project: "Выберите проект:", report_select_placeholder: "-- Выберите проект --", report_comment_label: "Ваш комментарий:", report_comment_placeholder: "Опишите проблему...", report_attach_photo: "Прикрепить фото:", report_attach_hint: "Допустимые форматы: JPG, PNG, GIF, WEBP (макс. 10MB)", report_geolocation_label: "Геолокация:", report_geolocation_fetching: "Получение координат...", report_geolocation_success: "Координаты получены", report_geolocation_error: "Не удалось получить координаты.", report_geolocation_permission_denied: "Доступ к геолокации запрещен.", report_geolocation_unavailable: "Информация о местоположении недоступна.", report_geolocation_timeout: "Время ожидания запроса геолокации истекло.", report_geolocation_unsupported: "Геолокация не поддерживается браузером.", report_submit_button: "Отправить отчет", report_latest_reports: "Последние отчеты граждан:", report_no_reports: "Пока нет отчетов.", report_no_reports_for_project: "Нет отчетов для этого проекта.", report_card_project: "Проект", report_card_comment: "Комментарий", report_card_date: "Дата", report_card_photo: "Фото", report_card_location: "Локация", report_card_unknown_project: "Неизвестный проект",
+                public_reports_title: "Публичные отчеты граждан", public_reports_title_filtered: "Отчеты по проекту: {projectName}", public_reports_show_all: "Показать все отчеты",
+                quiz_title: "Проверка знаний", // NEW
+                quiz_intro: "Прежде чем зарегистрироваться, ответьте на несколько вопросов.", // NEW
+                quiz_loading: "Загрузка вопросов...", // NEW
+                quiz_submit_button: "Отправить ответы", // NEW
+                quiz_pass_message: "Тест пройден успешно! Теперь вы можете зарегистрироваться.", // NEW
+                quiz_fail_message: "Тест не пройден. Пожалуйста, проверьте ответы и попробуйте снова.", // NEW
+                quiz_error_loading: "Не удалось загрузить вопросы теста.", // NEW
+                quiz_error_submitting: "Ошибка при отправке ответов.", // NEW
+                register_title: "Регистрация", // NEW
+                register_intro: "Тест пройден! Создайте ваш аккаунт.", // NEW
+                register_email_label: "Email:", // NEW
+                register_email_placeholder: "Введите ваш email", // NEW
+                register_password_label: "Пароль:", // NEW
+                register_password_placeholder: "Придумайте пароль (мин. 6 символов)", // NEW
+                register_confirm_password_label: "Подтвердите пароль:", // NEW
+                register_confirm_password_placeholder: "Повторите пароль", // NEW
+                register_submit_button: "Зарегистрироваться", // NEW
+                register_success_message: "Регистрация прошла успешно! Теперь вы можете войти.", // NEW
+                register_error_passwords_mismatch: "Пароли не совпадают.", // NEW
+                register_error_user_exists: "Пользователь с таким email уже существует.", // NEW
+                register_error_generic: "Ошибка регистрации. Попробуйте позже.", // NEW
+                login_title: "Вход", // NEW
+                login_intro: "Введите ваши данные для входа.", // NEW
+                message_success: "Успешно!", message_error_form: "Пожалуйста, заполните все обязательные поля.", message_docs_simulation: "Симуляция открытия документа:",
+                footer_year: new Date().getFullYear(), footer_rights: "Все права защищены.", locale_code: "ru-RU",
+                 'Loading reports...': 'Загрузка отчетов...', 'Loading projects...': 'Загрузка проектов...', 'Loading contractors...': 'Загрузка подрядчиков...', // Added Loading
+                 'Submitting...': 'Отправка...',
+                 'Error fetching data ({endpoint}): {message}': 'Ошибка загрузки данных ({endpoint}): {message}',
+                 'Error: Invalid coordinates for this project.': 'Ошибка: Неверные координаты для этого проекта.', 'Error: Project not found.': 'Ошибка: Проект не найден.', 'Error: Map not loaded yet.': 'Ошибка: Карта еще не загружена.', 'Error: Project location data is missing or invalid.': 'Ошибка: Данные о местоположении проекта отсутствуют или неверны.', 'Error submitting report. Please try again.': 'Ошибка отправки отчета. Пожалуйста, попробуйте еще раз.',
+                 'Failed to Load Application Data': 'Не удалось загрузить данные приложения', 'Please check your connection and refresh the page.': 'Пожалуйста, проверьте соединение и обновите страницу.',
+                 'Unnamed Project': 'Проект без названия', 'Unnamed Contractor': 'Подрядчик без названия', 'No document specified': 'Документ не указан', 'No docs': 'Нет документов'
             },
-            en: {
-                // ... (English translations - ensure all keys from RU exist) ...
+            en: { /* ... all English keys corresponding to RU ... */
                 locale_code: "en-US",
-                report_geolocation_permission_denied: "Geolocation access denied.",
-                report_geolocation_unavailable: "Location information is unavailable.",
-                report_geolocation_timeout: "Geolocation request timed out.",
-                 'Loading reports...': 'Loading reports...',
-                'Submitting...': 'Submitting...',
-                'Error fetching data ({endpoint}): {message}': 'Error fetching data ({endpoint}): {message}',
-                'Error: Invalid coordinates for this project.': 'Error: Invalid coordinates for this project.',
-                'Error: Project not found.': 'Error: Project not found.',
-                'Error: Map not loaded yet.': 'Error: Map not loaded yet.',
-                'Error: Project location data is missing or invalid.': 'Error: Project location data is missing or invalid.',
-                'Error submitting report. Please try again.': 'Error submitting report. Please try again.',
-                'Failed to Load Application Data': 'Failed to Load Application Data',
-                'Please check your connection and refresh the page.': 'Please check your connection and refresh the page.',
-                'Unnamed Project': 'Unnamed Project',
-                'Unnamed Contractor': 'Unnamed Contractor',
-                'No document specified': 'No document specified',
-                'No docs': 'No docs'
-                 // ... other EN keys ...
+                nav_login: "Login", nav_register: "Register",
+                quiz_title: "Knowledge Check", quiz_intro: "Before registering, please answer a few questions.", quiz_loading: "Loading questions...", quiz_submit_button: "Submit Answers", quiz_pass_message: "Quiz passed successfully! You can now register.", quiz_fail_message: "Quiz not passed. Please review your answers and try again.", quiz_error_loading: "Failed to load quiz questions.", quiz_error_submitting: "Error submitting answers.",
+                register_title: "Registration", register_intro: "Quiz passed! Create your account.", register_email_label: "Email:", register_email_placeholder: "Enter your email", register_password_label: "Password:", register_password_placeholder: "Create a password (min. 6 chars)", register_confirm_password_label: "Confirm Password:", register_confirm_password_placeholder: "Repeat password", register_submit_button: "Register", register_success_message: "Registration successful! You can now log in.", register_error_passwords_mismatch: "Passwords do not match.", register_error_user_exists: "User with this email already exists.", register_error_generic: "Registration error. Please try again later.",
+                login_title: "Login", login_intro: "Enter your credentials to log in."
+                //... other keys
             },
-            uz: {
-                // ... (Uzbek translations - ensure all keys from RU exist) ...
+            uz: { /* ... all Uzbek keys corresponding to RU ... */
                  locale_code: "uz-UZ",
-                report_geolocation_permission_denied: "Geolokatsiyaga ruxsat berilmadi.",
-                report_geolocation_unavailable: "Joylashuv ma'lumotlari mavjud emas.",
-                report_geolocation_timeout: "Geolokatsiya so'rovi vaqti tugadi.",
-                 'Loading reports...': 'Hisobotlar yuklanmoqda...',
-                'Submitting...': 'Yuborilmoqda...',
-                'Error fetching data ({endpoint}): {message}': 'Maʼlumotlarni yuklashda xatolik ({endpoint}): {message}',
-                'Error: Invalid coordinates for this project.': "Xatolik: Ushbu loyiha uchun noto'g'ri koordinatalar.",
-                'Error: Project not found.': 'Xatolik: Loyiha topilmadi.',
-                'Error: Map not loaded yet.': 'Xatolik: Xarita hali yuklanmagan.',
-                'Error: Project location data is missing or invalid.': "Xatolik: Loyihaning joylashuvi ma'lumotlari yo'q yoki noto'g'ri.",
-                'Error submitting report. Please try again.': 'Hisobot yuborishda xatolik. Qaytadan urinib ko‘ring.',
-                'Failed to Load Application Data': 'Ilova maʼlumotlarini yuklab boʻlmadi',
-                'Please check your connection and refresh the page.': 'Iltimos, ulanishni tekshiring va sahifani yangilang.',
-                 'Unnamed Project': "Nomsiz loyiha",
-                'Unnamed Contractor': "Nomsiz pudratchi",
-                'No document specified': 'Hujjat ko‘rsatilmagan',
-                'No docs': 'Hujjatlar yo‘q'
-                // ... other UZ keys ...
+                 nav_login: "Kirish", nav_register: "Ro'yxatdan o'tish",
+                 quiz_title: "Bilimni tekshirish", quiz_intro: "Ro'yxatdan o'tishdan oldin, bir nechta savolga javob bering.", quiz_loading: "Savollar yuklanmoqda...", quiz_submit_button: "Javoblarni yuborish", quiz_pass_message: "Test muvaffaqiyatli o'tdi! Endi ro'yxatdan o'tishingiz mumkin.", quiz_fail_message: "Testdan o'tolmadingiz. Iltimos, javoblaringizni tekshirib, qayta urinib ko'ring.", quiz_error_loading: "Test savollarini yuklab bo‘lmadi.", quiz_error_submitting: "Javoblarni yuborishda xatolik.",
+                 register_title: "Ro'yxatdan o'tish", register_intro: "Testdan o'tdingiz! Akkuntingizni yarating.", register_email_label: "Email:", register_email_placeholder: "Emailingizni kiriting", register_password_label: "Parol:", register_password_placeholder: "Parol yarating (min. 6 belgi)", register_confirm_password_label: "Parolni tasdiqlang:", register_confirm_password_placeholder: "Parolni takrorlang", register_submit_button: "Ro'yxatdan o'tish", register_success_message: "Muvaffaqiyatli roʻyxatdan oʻtdingiz! Endi tizimga kirishingiz mumkin.", register_error_passwords_mismatch: "Parollar mos kelmadi.", register_error_user_exists: "Bunday emailga ega foydalanuvchi mavjud.", register_error_generic: "Ro'yxatdan o'tishda xatolik. Keyinroq urinib ko'ring.",
+                 login_title: "Kirish", login_intro: "Kirish uchun maʼlumotlaringizni kiriting."
+                 //... other keys
             }
         };
 
         // --- ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ---
-        const API_BASE_URL = 'https://backranners.onrender.com'; // Оставляем пустым, если фронтенд и бэкенд на одном домене/порту
+        const API_BASE_URL = '';
         let currentLanguage = 'ru';
         let map;
         let markers = {};
-        let allProjectsData = []; // Кеш данных проектов
-        let allContractorsData = []; // Кеш данных подрядчиков
-        let allReportsData = []; // Кеш данных отчетов
-
+        let allProjectsData = [];
+        let allContractorsData = [];
+        let allReportsData = [];
+        let currentQuizQuestions = []; // NEW: Store current quiz questions
+        let quizPassed = false; // NEW: Track quiz status
 
         // --- ФУНКЦИИ ---
 
-        // Утилита для загрузки данных
+        // Утилита для загрузки данных (GET)
         async function fetchData(endpoint) {
             try {
                 const response = await fetch(`${API_BASE_URL}/api/${endpoint}`);
                 if (!response.ok) {
-                    let errorData;
-                    try { errorData = await response.json(); } catch (e) { /* ignore */ }
+                    let errorData; try { errorData = await response.json(); } catch (e) { /* ignore */ }
                     const errorMessage = errorData?.message || `HTTP error! status: ${response.status}`;
                     throw new Error(errorMessage);
                 }
@@ -573,9 +357,48 @@
             } catch (error) {
                 console.error(`Error fetching ${endpoint}:`, error);
                 showMessage(_('Error fetching data ({endpoint}): {message}', { endpoint: endpoint, message: error.message }), 'error', 5000);
-                return [];
+                return null; // Return null on error instead of empty array to distinguish
             }
         }
+
+        // Утилита для отправки данных (POST, PUT, DELETE)
+        async function sendData(endpoint, method = 'POST', bodyData = null, isFormData = false) {
+            try {
+                const options = {
+                    method: method,
+                    headers: {}, // Initialize headers
+                    body: null
+                };
+
+                if (bodyData) {
+                    if (isFormData) {
+                        // Don't set Content-Type for FormData, browser does it
+                        options.body = bodyData;
+                    } else {
+                        options.headers['Content-Type'] = 'application/json';
+                        options.body = JSON.stringify(bodyData);
+                    }
+                }
+
+                // Add authorization token if available (for future login)
+                // const token = localStorage.getItem('authToken');
+                // if (token) options.headers['Authorization'] = `Bearer ${token}`;
+
+                const response = await fetch(`${API_BASE_URL}/api/${endpoint}`, options);
+                const result = await response.json(); // Try to parse JSON always
+
+                if (!response.ok) {
+                     throw new Error(result.message || `HTTP error! status: ${response.status}`);
+                }
+                return result; // Return parsed JSON from backend
+            } catch (error) {
+                 console.error(`Error ${method}ing data to ${endpoint}:`, error);
+                 // Use the error message from the backend if available
+                 showMessage(error.message || `Error communicating with server.`, 'error', 5000);
+                 return null; // Indicate failure
+            }
+        }
+
 
         // --- Обновленная функция установки языка ---
         async function setLanguage(lang) {
@@ -583,67 +406,40 @@
             currentLanguage = lang;
             const langData = languages[lang];
 
-            // Применяем переводы к элементам с data-lang-key
+            // Apply translations
             document.querySelectorAll('[data-lang-key]').forEach(el => {
-                const key = el.dataset.langKey;
-                const text = _(key); // Use translation helper which handles fallbacks
-
-                // Special handling for the filtered reports title
+                const key = el.dataset.langKey; const text = _(key);
                 if (el.id === 'public-reports-title' && key === 'public_reports_title_filtered') {
-                     // Keep existing logic or simplify based on how filter state is managed
                      const currentText = el.textContent;
-                     // Basic check if it's currently filtered (adjust if needed)
                      if (currentText.startsWith(_('public_reports_title_filtered', {projectName:''}).split(':')[0])) {
                           const match = currentText.match(/:\s*(.+)/);
-                          if (match && match[1]) {
-                               el.textContent = _(key, { projectName: match[1] });
-                          } else {
-                               el.textContent = _('public_reports_title'); // Fallback
-                          }
-                     } else {
-                          el.textContent = _('public_reports_title');
-                     }
-                } else {
-                     el.textContent = text; // Set translated text
-                }
+                          el.textContent = match && match[1] ? _(key, { projectName: match[1] }) : _('public_reports_title');
+                     } else { el.textContent = _('public_reports_title'); }
+                } else { el.textContent = text; }
             });
+             document.querySelectorAll('[data-lang-placeholder-key]').forEach(el => { el.placeholder = _(el.dataset.langPlaceholderKey); });
 
-             // Применяем переводы к плейсхолдерам
-             document.querySelectorAll('[data-lang-placeholder-key]').forEach(el => {
-                 const key = el.dataset.langPlaceholderKey;
-                  el.placeholder = _(key); // Use translation helper
-             });
-
-            // Обновляем язык документа и заголовок
             document.documentElement.lang = lang;
             document.title = _('platform_title');
             document.getElementById('current-lang').textContent = lang.toUpperCase();
             localStorage.setItem('preferredLanguage', lang);
 
-            // Перерисовываем компоненты с кешированными данными на новом языке
-            displayProjectsInList();
-            displayContractors();
-            populateProjectSelect();
-            displayCitizenReports();
-
-            // Показываем все публичные отчеты при смене языка для простоты
-            await displayPublicReports(null);
-
+            // Re-render components
+            displayProjectsInList(); displayContractors(); populateProjectSelect(); displayCitizenReports();
+            await displayPublicReports(null); // Show all public reports on lang change
             if (map) displayProjectsOnMap();
             updateFooterYear();
+             // Re-render quiz questions if quiz section is visible and questions loaded
+             if (currentQuizQuestions.length > 0 && !document.getElementById('quiz-section').classList.contains('hidden')) {
+                 renderQuizQuestions();
+             }
         }
 
         // --- Помощник для перевода ---
         function _(key, args = null) {
-            let text = languages[currentLanguage]?.[key];
-            if (text === undefined) { text = languages['en']?.[key]; } // Fallback to English
-            if (text === undefined) { text = key; } // Fallback to key itself
-
+            let text = languages[currentLanguage]?.[key] ?? languages['en']?.[key] ?? key;
              if (args && typeof args === 'object' && typeof text === 'string') {
-                 for (const k in args) {
-                     const placeholder = new RegExp(`\\{${k}\\}`, 'g');
-                     text = text.replace(placeholder, args[k]);
-                 }
+                 for (const k in args) { text = text.replace(new RegExp(`\\{${k}\\}`, 'g'), args[k]); }
              }
             return text;
         }
@@ -651,354 +447,278 @@
 
         // --- Функции загрузки и кеширования данных ---
         async function loadProjects() {
-            allProjectsData = await fetchData('projects');
+            allProjectsData = (await fetchData('projects')) || []; // Use empty array on fetch error
             if (allContractorsData.length === 0) await loadContractors();
         }
         async function loadContractors() {
-            allContractorsData = await fetchData('contractors');
+            allContractorsData = (await fetchData('contractors')) || []; // Use empty array on fetch error
         }
         async function loadReports(projectId = null) {
              const endpoint = projectId ? `reports?projectId=${projectId}` : 'reports';
-             const fetchedReports = await fetchData(endpoint);
+             const fetchedReports = (await fetchData(endpoint)) || []; // Use empty array on fetch error
              allReportsData = fetchedReports.sort((a, b) => new Date(b.date) - new Date(a.date));
         }
          async function loadInitialData() {
+             // Show loading indicators
+             document.getElementById('project-list').innerHTML = `<p class="text-gray-500 italic p-4">${_('Loading projects...')}</p>`;
+             document.getElementById('contractor-list').innerHTML = `<p class="text-gray-500 italic p-4">${_('Loading contractors...')}</p>`;
+             document.getElementById('public-reports-list').innerHTML = `<p class="text-gray-500 italic p-4">${_('Loading reports...')}</p>`;
+             document.getElementById('reports-list').innerHTML = `<p class="text-gray-500 italic p-4">${_('Loading reports...')}</p>`;
+
              await Promise.all([ loadProjects(), loadReports() ]);
              if(allContractorsData.length === 0) await loadContractors();
          }
 
+
         // --- Помощники для получения данных ---
-        function getContractorName(contractorId) {
-            const contractor = allContractorsData.find(c => String(c.id) === String(contractorId));
-            return contractor ? contractor.name : _('report_card_unknown_project');
-        }
-        function getContractorRating(contractorId) {
-            const contractor = allContractorsData.find(c => String(c.id) === String(contractorId));
-             return contractor && typeof contractor.rating === 'number' ? contractor.rating.toFixed(1) : 'N/A';
-        }
-        function getProjectName(projectId) {
-            const project = allProjectsData.find(p => String(p.id) === String(projectId));
-            return project ? project.name : _('report_card_unknown_project');
-        }
+        function getContractorName(contractorId) { const c = allContractorsData.find(c => String(c.id) === String(contractorId)); return c ? c.name : _('report_card_unknown_project'); }
+        function getContractorRating(contractorId) { const c = allContractorsData.find(c => String(c.id) === String(contractorId)); return c && typeof c.rating === 'number' ? c.rating.toFixed(1) : 'N/A'; }
+        function getProjectName(projectId) { const p = allProjectsData.find(p => String(p.id) === String(projectId)); return p ? p.name : _('report_card_unknown_project'); }
 
-        // --- Инициализация карты ---
-        function initializeMap() {
-            if (map) { map.remove(); map = null; }
-             map = L.map('map').setView([41.3111, 69.2797], 12);
-             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                 maxZoom: 19, attribution: '&copy; OpenStreetMap'
-             }).addTo(map);
-             markers = {};
-             displayProjectsOnMap();
-        }
+        // --- Функции Карты (без изменений) ---
+        function initializeMap() { if (map) { map.remove(); map = null; } map = L.map('map').setView([41.3111, 69.2797], 12); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap' }).addTo(map); markers = {}; displayProjectsOnMap(); }
+        function displayProjectsOnMap() { if (!map || !Array.isArray(allProjectsData)) return; Object.values(markers).forEach(m => { if(map.hasLayer(m)) map.removeLayer(m); }); markers = {}; if(allProjectsData.length === 0) return; allProjectsData.forEach(p => { if (!p.location || !Array.isArray(p.location) || p.location.length !== 2) return; const lat = parseFloat(p.location[0]), lon = parseFloat(p.location[1]); if(isNaN(lat) || isNaN(lon)) return; const marker = L.marker([lat, lon]); const safeName = p.name ? p.name.replace(/</g,"&lt;").replace(/>/g,"&gt;") : _('Unnamed Project'); const popup = `<div class="text-xs p-1"><b class="text-sm block mb-1">${safeName}</b><b>${_('map_popup_status')}:</b> ${p.status||'N/A'}<br><b>${_('map_popup_budget')}:</b> ${p.budget||'N/A'}<br><b>${_('map_popup_deadline')}:</b> ${p.deadline||'N/A'}<br><b>${_('map_popup_contractor')}:</b> ${getContractorName(p.contractorId)}<br><a href="#" onclick="alert('${_('message_docs_simulation')} ${p.docs || _('No document specified')}')" class="text-blue-600 hover:underline">${_('map_popup_docs')}</a>${p.citizenAlertLevel > 0 ? `<br><b class="text-red-600 mt-1 block">${_('map_popup_alert')}</b>` : ''}</div>`; marker.bindPopup(popup, {minWidth: 200}).addTo(map); markers[String(p.id)] = marker; }); }
+        function focusProjectOnMap(projectId) { const pid = String(projectId); const p = allProjectsData.find(proj => String(proj.id) === pid); if (p && map && p.location && Array.isArray(p.location) && p.location.length === 2) { const lat = parseFloat(p.location[0]), lon = parseFloat(p.location[1]); if (!isNaN(lat) && !isNaN(lon)) { showSection('map-section', false); map.flyTo([lat, lon], 16); if (markers[pid]) { setTimeout(() => { if (markers[pid] && map.hasLayer(markers[pid])) markers[pid].openPopup(); }, 500); } else { console.warn(`Marker ${pid} not found.`); } } else { showMessage(_('Error: Invalid coordinates for this project.'), 'error'); } } else if (!p) { showMessage(_('Error: Project not found.'), 'error'); } else if (!map) { showMessage(_('Error: Map not loaded yet.'), 'error'); } else { showMessage(_('Error: Project location data is missing or invalid.'), 'error'); } }
 
-        // --- Отображение проектов на карте ---
-        function displayProjectsOnMap() {
-            if (!map || !Array.isArray(allProjectsData)) return;
-            Object.values(markers).forEach(marker => { if (map.hasLayer(marker)) map.removeLayer(marker); });
-            markers = {};
+        // --- Отображение списков (Проекты, Подрядчики, Отчеты - без существенных изменений, кроме loading text) ---
+        function displayProjectsInList(filteredProjects = null) { const list = document.getElementById('project-list'); const data = filteredProjects ?? allProjectsData; list.innerHTML = ''; if (!Array.isArray(data) || data.length === 0) { list.innerHTML = `<p class="text-gray-500 italic p-4">${_('projects_not_found')}</p>`; return; } data.forEach(p => { const alertClass = p.citizenAlertLevel===2?'border-red-400 bg-red-50/50':(p.citizenAlertLevel===1?'border-yellow-400 bg-yellow-50/50':'border-gray-200'); const alertKey = p.citizenAlertLevel===2?'project_alert_serious':(p.citizenAlertLevel===1?'project_alert_minor':null); let alertHtml=''; if(alertKey){const alertTxtC=p.citizenAlertLevel===2?'text-red-700':'text-yellow-700'; const alertBgC=p.citizenAlertLevel===2?'bg-red-100':'bg-yellow-100'; const link=`<a href="#" onclick="showProjectReports('${String(p.id)}'); return false;" class="ml-2 text-blue-600 hover:underline font-medium">${_('project_view_reports_link')}</a>`; alertHtml=`<div class="text-xs font-semibold ${alertTxtC} mt-2 p-2 rounded-md ${alertBgC}">${_(alertKey)} ${link}</div>`;} const deadline = p.deadline||'N/A'; const card = `<div class="list-card ${alertClass}"><h3>${p.name||_('Unnamed Project')}</h3><div class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-600 mb-2"><p><span class="font-medium">${_('project_status')}:</span> ${p.status||'N/A'}</p><p><span class="font-medium">${_('project_budget')}:</span> ${p.budget||'N/A'}</p><p><span class="font-medium">${_('project_deadline')}:</span> ${deadline}</p><p><span class="font-medium">${_('project_contractor')}:</span> ${getContractorName(p.contractorId)} (${_('project_rating')}: ${getContractorRating(p.contractorId)} ★)</p></div><p class="text-xs text-gray-600 mt-1 mb-2"><span class="font-medium">${_('project_official_report')}:</span> <span class="italic">${p.officialReport||'N/A'}</span></p><div class="flex items-center space-x-4 mt-3"><a href="#" onclick="alert('${_('message_docs_simulation')} ${p.docs || _('No docs')}')" class="text-xs text-blue-600 hover:underline font-medium">${_('project_docs_link')}</a><button onclick="focusProjectOnMap('${String(p.id)}')" class="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded-md hover:bg-gray-200 transition duration-150 ease-in-out flex items-center"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="w-3 h-3 mr-1"><path fill-rule="evenodd" d="M8.5 4.25a.75.75 0 00-1.5 0v5.5a.75.75 0 001.5 0v-5.5zM5.75 6.5a.75.75 0 000 1.5h4.5a.75.75 0 000-1.5h-4.5zM4 10a.75.75 0 01.75-.75h6.5a.75.75 0 010 1.5h-6.5A.75.75 0 014 10z" clip-rule="evenodd"></path></svg> ${_('project_show_on_map')}</button></div>${alertHtml}</div>`; list.innerHTML += card; });}
+        function displayContractors() { const list = document.getElementById('contractor-list'); list.innerHTML = ''; if (!Array.isArray(allContractorsData) || allContractorsData.length === 0) { list.innerHTML = `<p class="text-gray-500 italic p-4">${_('contractor_no_projects')}</p>`; return; } const sorted = [...allContractorsData].sort((a, b) => (b.rating || 0) - (a.rating || 0)); sorted.forEach(c => { const projs = allProjectsData.filter(p => String(p.contractorId) === String(c.id)); const items = projs.length > 0 ? projs.map(p => `<li class="text-xs">${p.name||_('Unnamed Project')} (${p.status||'N/A'})</li>`).join('') : `<li class="text-xs italic">${_('contractor_no_projects')}</li>`; const rating = getContractorRating(c.id); const card = `<div class="list-card"><h3>${c.name||_('Unnamed Contractor')}</h3><p class="text-xs text-gray-600 mt-1 mb-1"><span class="font-medium">${_('contractor_rating')}:</span> <span class="font-bold text-yellow-500">${rating} ★</span></p><p class="text-xs text-gray-600 mb-2"><span class="font-medium">${_('contractor_projects_completed')}:</span> ${c.projectsCompleted||0}</p><div class="mt-2 border-t border-gray-100 pt-2"><h4 class="text-xs font-semibold text-gray-700 mb-1">${_('contractor_current_projects')}</h4><ul class="list-disc list-inside text-xs space-y-0.5 pl-2">${items}</ul></div></div>`; list.innerHTML += card; }); }
+        function populateProjectSelect() { const sel = document.getElementById('report-project'); const curVal = sel.value; sel.innerHTML = ''; const ph = document.createElement('option'); ph.value = ""; ph.textContent = _('report_select_placeholder'); ph.selected = !curVal; ph.disabled = false; sel.appendChild(ph); if (!Array.isArray(allProjectsData) || allProjectsData.length === 0) return; const sorted = [...allProjectsData].sort((a, b) => (a.name||'').localeCompare(b.name||'')); sorted.forEach(p => { const opt = document.createElement('option'); opt.value = p.id; opt.textContent = p.name||_('Unnamed Project'); opt.selected = String(p.id) === curVal; sel.appendChild(opt); }); if (sel.value !== "") ph.disabled = true; sel.addEventListener('change', function() {const p = this.querySelector('option[value=""]'); if(this.value !== "" && p) p.disabled = true;}, { once: true }); }
+        function displayCitizenReports() { const list = document.getElementById('reports-list'); list.innerHTML = ''; if (!Array.isArray(allReportsData) || allReportsData.length === 0) { list.innerHTML = `<p class="text-gray-500 italic text-sm">${_('report_no_reports')}</p>`; return; } const recent = allReportsData.slice(0, 5); recent.forEach(r => { const pName = getProjectName(r.projectId); const date = r.date ? new Date(r.date).toLocaleString(_('locale_code', 'ru-RU'), {dateStyle:'medium', timeStyle:'short'}) : 'N/A'; const loc = r.location ? ` | <span class="whitespace-nowrap">${_('report_card_location')}: ${r.location.lat.toFixed(4)}, ${r.location.lon.toFixed(4)}</span>` : ''; const photo = r.photoPath ? `<div class="mt-2"><a href="${r.photoPath}" target="_blank" title="${_('report_card_photo')}"><img src="${r.photoPath}" alt="${_('report_card_photo')} for ${pName}" class="max-h-32 max-w-full rounded border border-gray-200 shadow-sm" loading="lazy"></a></div>` : ''; const el = `<div class="border-b border-gray-100 pb-3 mb-3 last:border-b-0 last:pb-0 last:mb-0"><p class="text-sm font-medium text-gray-800 mb-0.5">${pName}</p><p class="text-sm text-gray-700 mb-1 break-words">${r.comment||''}</p>${photo}<p class="text-xs text-gray-500 mt-1"><span class="whitespace-nowrap">${_('report_card_date')}: ${date}</span>${loc}</p></div>`; list.innerHTML += el; }); }
+        async function displayPublicReports(filterProjectId = null) { const list = document.getElementById('public-reports-list'); const title = document.getElementById('public-reports-title'); const btn = document.getElementById('show-all-reports-button'); list.innerHTML = `<p class="text-gray-500 italic p-4">${_('Loading reports...')}</p>`; let isFiltered = false; await loadReports(filterProjectId); let data = allReportsData; if (filterProjectId !== null) { isFiltered = true; const p = allProjectsData.find(proj => String(proj.id) === String(filterProjectId)); const pName = p ? p.name : `ID ${filterProjectId}`; title.textContent = _('public_reports_title_filtered', { projectName: pName }); btn.classList.remove('hidden'); } else { title.textContent = _('public_reports_title'); btn.classList.add('hidden'); } list.innerHTML = ''; if (!Array.isArray(data) || data.length === 0) { list.innerHTML = `<p class="text-gray-500 italic p-4">${_(isFiltered ? 'report_no_reports_for_project' : 'report_no_reports')}</p>`; return; } data.forEach(r => { const pName = getProjectName(r.projectId); const date = r.date ? new Date(r.date).toLocaleString(_('locale_code', 'ru-RU'), {dateStyle:'medium', timeStyle:'short'}) : 'N/A'; const dateIcon=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="icon"><path fill-rule="evenodd" d="M4 1.75a.75.75 0 01.75-.75h6.5a.75.75 0 01.75.75V3h1.75A1.75 1.75 0 0115.5 4.75v8.5A1.75 1.75 0 0113.75 15H2.25A1.75 1.75 0 01.5 13.25v-8.5A1.75 1.75 0 012.25 3H4V1.75zM2 6.25v7A.25.25 0 002.25 13.5h11.5a.25.25 0 00.25-.25v-7H2zM14 4.75a.25.25 0 00-.25-.25H2.25a.25.25 0 00-.25.25V5h12V4.75z" clip-rule="evenodd"></path></svg>`; const projectIcon=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="icon"><path d="M3.75 2a.75.75 0 00-1.5 0v12c0 .414.336.75.75.75h10.5a.75.75 0 00.75-.75V8.75a.75.75 0 00-1.5 0v4.5h-9v-11h3V2H3.75z"></path><path d="M8.75 2a.75.75 0 000 1.5h3.56l-7.22 7.22a.75.75 0 101.06 1.06L13.5 4.31V7.75a.75.75 0 001.5 0V2.75a.75.75 0 00-.75-.75H8.75z"></path></svg>`; const locationIcon=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="icon"><path fill-rule="evenodd" d="M8 1.75a.75.75 0 01.75.75V3a.75.75 0 01-1.5 0V2.5A.75.75 0 018 1.75zM4.75 4.5a.75.75 0 01.75-.75h5.5a.75.75 0 010 1.5h-5.5a.75.75 0 01-.75-.75zM10.75 8a.75.75 0 01-.75.75H6a.75.75 0 010-1.5h4a.75.75 0 01.75.75zM8 11.75a.75.75 0 01.75.75v.5a.75.75 0 01-1.5 0v-.5a.75.75 0 01.75-.75z" clip-rule="evenodd"></path><path d="M3.75 0A1.75 1.75 0 002 1.75v12.5c0 .966.784 1.75 1.75 1.75h8.5A1.75 1.75 0 0014 14.25V1.75A1.75 1.75 0 0012.25 0h-8.5zM3.5 1.75c0-.138.112-.25.25-.25h8.5a.25.25 0 01.25.25v12.5a.25.25 0 01-.25.25h-8.5a.25.25 0 01-.25-.25V1.75z"></path></svg>`; const locHtml = r.location ? `<span class="whitespace-nowrap flex items-center">${locationIcon}${_('report_card_location')}: ${r.location.lat.toFixed(4)}, ${r.location.lon.toFixed(4)}</span>` : ''; const photoHtml = r.photoPath ? `<div class="mt-2"><a href="${r.photoPath}" target="_blank" title="${_('report_card_photo')}"><img src="${r.photoPath}" alt="${_('report_card_photo')} for ${pName}" class="max-h-48 max-w-full rounded border border-gray-300 shadow-sm hover:shadow-md transition-shadow" loading="lazy"></a></div>` : ''; const card = `<div class="list-card"><h4>${_('report_card_comment')}:</h4><p class="text-gray-800 mb-2 break-words">${r.comment||''}</p>${photoHtml}<div class="report-card-meta flex flex-wrap items-center gap-x-4 gap-y-1 mt-3"><span class="whitespace-nowrap flex items-center">${dateIcon}${_('report_card_date')}: ${date}</span><span class="whitespace-nowrap flex items-center">${projectIcon}${_('report_card_project')}: ${pName}</span>${locHtml||''}</div></div>`; list.innerHTML += card; }); }
 
-            if (allProjectsData.length === 0) return;
-
-            allProjectsData.forEach(project => {
-                if (!project.location || !Array.isArray(project.location) || project.location.length !== 2) return;
-                const lat = parseFloat(project.location[0]), lon = parseFloat(project.location[1]);
-                if (isNaN(lat) || isNaN(lon)) return;
-
-                const marker = L.marker([lat, lon]);
-                const safeProjectName = project.name ? project.name.replace(/</g, "&lt;").replace(/>/g, "&gt;") : _('Unnamed Project');
-                const popupContent = `
-                    <div class="text-xs p-1">
-                        <b class="text-sm block mb-1">${safeProjectName}</b>
-                        <b>${_('map_popup_status')}:</b> ${project.status || 'N/A'}<br>
-                        <b>${_('map_popup_budget')}:</b> ${project.budget || 'N/A'}<br>
-                        <b>${_('map_popup_deadline')}:</b> ${project.deadline || 'N/A'}<br>
-                        <b>${_('map_popup_contractor')}:</b> ${getContractorName(project.contractorId)}<br>
-                        <a href="#" onclick="alert('${_('message_docs_simulation')} ${project.docs || _('No document specified')}')" class="text-blue-600 hover:underline">${_('map_popup_docs')}</a>
-                        ${project.citizenAlertLevel > 0 ? `<br><b class="text-red-600 mt-1 block">${_('map_popup_alert')}</b>` : ''}
-                    </div>`;
-                marker.bindPopup(popupContent, {minWidth: 200}).addTo(map);
-                markers[String(project.id)] = marker;
-            });
-        }
-
-        // --- Отображение списка проектов ---
-        function displayProjectsInList(filteredProjects = null) {
-            const projectList = document.getElementById('project-list');
-            const projectsToDisplay = filteredProjects !== null ? filteredProjects : allProjectsData;
-            projectList.innerHTML = '';
-
-            if (!Array.isArray(projectsToDisplay) || projectsToDisplay.length === 0) {
-                projectList.innerHTML = `<p class="text-gray-500 italic p-4">${_('projects_not_found')}</p>`; return;
-            }
-
-            projectsToDisplay.forEach(project => {
-                const alertClass = project.citizenAlertLevel === 2 ? 'border-red-400 bg-red-50/50' : (project.citizenAlertLevel === 1 ? 'border-yellow-400 bg-yellow-50/50' : 'border-gray-200');
-                const alertTextKey = project.citizenAlertLevel === 2 ? 'project_alert_serious' : (project.citizenAlertLevel === 1 ? 'project_alert_minor' : null);
-                let alertHtml = '';
-                if (alertTextKey) {
-                    const alertTextColor = project.citizenAlertLevel === 2 ? 'text-red-700' : 'text-yellow-700';
-                    const alertBgColor = project.citizenAlertLevel === 2 ? 'bg-red-100' : 'bg-yellow-100';
-                    const viewReportsLink = `<a href="#" onclick="showProjectReports('${String(project.id)}'); return false;" class="ml-2 text-blue-600 hover:underline font-medium">${_('project_view_reports_link')}</a>`;
-                    alertHtml = `<div class="text-xs font-semibold ${alertTextColor} mt-2 p-2 rounded-md ${alertBgColor}">${_(alertTextKey)} ${viewReportsLink}</div>`;
-                }
-                const formattedDeadline = project.deadline || 'N/A';
-                const projectCard = `
-                    <div class="list-card ${alertClass}">
-                        <h3>${project.name || _('Unnamed Project')}</h3>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-600 mb-2">
-                             <p><span class="font-medium">${_('project_status')}:</span> ${project.status || 'N/A'}</p>
-                             <p><span class="font-medium">${_('project_budget')}:</span> ${project.budget || 'N/A'}</p>
-                             <p><span class="font-medium">${_('project_deadline')}:</span> ${formattedDeadline}</p>
-                             <p><span class="font-medium">${_('project_contractor')}:</span> ${getContractorName(project.contractorId)} (${_('project_rating')}: ${getContractorRating(project.contractorId)} ★)</p>
-                        </div>
-                         <p class="text-xs text-gray-600 mt-1 mb-2"><span class="font-medium">${_('project_official_report')}:</span> <span class="italic">${project.officialReport || 'N/A'}</span></p>
-                        <div class="flex items-center space-x-4 mt-3">
-                            <a href="#" onclick="alert('${_('message_docs_simulation')} ${project.docs || _('No docs')}')" class="text-xs text-blue-600 hover:underline font-medium">${_('project_docs_link')}</a>
-                             <button onclick="focusProjectOnMap('${String(project.id)}')" class="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded-md hover:bg-gray-200 transition duration-150 ease-in-out flex items-center">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="w-3 h-3 mr-1"><path fill-rule="evenodd" d="M8.5 4.25a.75.75 0 00-1.5 0v5.5a.75.75 0 001.5 0v-5.5zM5.75 6.5a.75.75 0 000 1.5h4.5a.75.75 0 000-1.5h-4.5zM4 10a.75.75 0 01.75-.75h6.5a.75.75 0 010 1.5h-6.5A.75.75 0 014 10z" clip-rule="evenodd"></path></svg> ${_('project_show_on_map')}
-                            </button>
-                         </div>
-                         ${alertHtml}
-                    </div>`;
-                projectList.innerHTML += projectCard;
-            });
-        }
-
-        // --- Фокусировка на проекте на карте ---
-        function focusProjectOnMap(projectId) {
-            const projectIdStr = String(projectId);
-            const project = allProjectsData.find(p => String(p.id) === projectIdStr);
-            if (project && map && project.location && Array.isArray(project.location) && project.location.length === 2) {
-                const lat = parseFloat(project.location[0]), lon = parseFloat(project.location[1]);
-                if (!isNaN(lat) && !isNaN(lon)) {
-                    showSection('map-section', false);
-                    map.flyTo([lat, lon], 16);
-                    if (markers[projectIdStr]) {
-                        setTimeout(() => { if (markers[projectIdStr] && map.hasLayer(markers[projectIdStr])) markers[projectIdStr].openPopup(); }, 500);
-                    } else { console.warn(`Маркер для проекта ${projectIdStr} не найден.`); }
-                } else { showMessage(_('Error: Invalid coordinates for this project.'), 'error'); }
-            } else if (!project) { showMessage(_('Error: Project not found.'), 'error');
-            } else if (!map) { showMessage(_('Error: Map not loaded yet.'), 'error');
-            } else { showMessage(_('Error: Project location data is missing or invalid.'), 'error'); }
-        }
-
-        // --- Отображение подрядчиков ---
-        function displayContractors() {
-            const contractorList = document.getElementById('contractor-list');
-            contractorList.innerHTML = '';
-            if (!Array.isArray(allContractorsData) || allContractorsData.length === 0) {
-                contractorList.innerHTML = `<p class="text-gray-500 italic p-4">${_('contractor_no_projects')}</p>`; return;
-            }
-            const sortedContractors = [...allContractorsData].sort((a, b) => (b.rating || 0) - (a.rating || 0));
-            sortedContractors.forEach(contractor => {
-                const contractorProjects = allProjectsData.filter(p => String(p.contractorId) === String(contractor.id));
-                const projectListItems = contractorProjects.length > 0
-                    ? contractorProjects.map(p => `<li class="text-xs">${p.name || _('Unnamed Project')} (${p.status || 'N/A'})</li>`).join('')
-                    : `<li class="text-xs italic">${_('contractor_no_projects')}</li>`;
-                const contractorRatingDisplay = getContractorRating(contractor.id);
-                const contractorCard = `
-                    <div class="list-card">
-                        <h3>${contractor.name || _('Unnamed Contractor')}</h3>
-                         <p class="text-xs text-gray-600 mt-1 mb-1"><span class="font-medium">${_('contractor_rating')}:</span> <span class="font-bold text-yellow-500">${contractorRatingDisplay} ★</span></p>
-                        <p class="text-xs text-gray-600 mb-2"><span class="font-medium">${_('contractor_projects_completed')}:</span> ${contractor.projectsCompleted || 0}</p>
-                        <div class="mt-2 border-t border-gray-100 pt-2">
-                            <h4 class="text-xs font-semibold text-gray-700 mb-1">${_('contractor_current_projects')}</h4>
-                            <ul class="list-disc list-inside text-xs space-y-0.5 pl-2"> ${projectListItems} </ul>
-                        </div>
-                    </div>`;
-                contractorList.innerHTML += contractorCard;
-            });
-        }
-
-        // --- Заполнение выпадающего списка проектов ---
-        function populateProjectSelect() {
-            const selectElement = document.getElementById('report-project');
-            const currentValue = selectElement.value;
-            selectElement.innerHTML = '';
-            const placeholderOption = document.createElement('option');
-            placeholderOption.value = "";
-            placeholderOption.textContent = _('report_select_placeholder');
-            placeholderOption.selected = !currentValue;
-            placeholderOption.disabled = false; // Start enabled
-            selectElement.appendChild(placeholderOption);
-            if (!Array.isArray(allProjectsData) || allProjectsData.length === 0) return;
-            const sortedProjects = [...allProjectsData].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-            sortedProjects.forEach(project => {
-                const option = document.createElement('option');
-                 option.value = project.id;
-                option.textContent = project.name || _('Unnamed Project');
-                 option.selected = String(project.id) === currentValue;
-                selectElement.appendChild(option);
-            });
-             if (selectElement.value !== "") placeholderOption.disabled = true;
-             selectElement.addEventListener('change', function() {
-                 const ph = this.querySelector('option[value=""]');
-                 if(this.value !== "" && ph) ph.disabled = true;
-             }, { once: true });
-        }
-
-        // --- Отображение ПОСЛЕДНИХ отчетов граждан (в секции отправки) ---
-        function displayCitizenReports() {
-            const reportsList = document.getElementById('reports-list');
-            reportsList.innerHTML = '';
-            if (!Array.isArray(allReportsData) || allReportsData.length === 0) {
-                reportsList.innerHTML = `<p class="text-gray-500 italic text-sm">${_('report_no_reports')}</p>`; return;
-            }
-            const recentReports = allReportsData.slice(0, 5);
-            recentReports.forEach(report => {
-                const projectName = getProjectName(report.projectId);
-                 const formattedDate = report.date ? new Date(report.date).toLocaleString(_('locale_code', 'ru-RU'), { dateStyle: 'medium', timeStyle: 'short' }) : 'N/A';
-                 const locationText = report.location ? ` | <span class="whitespace-nowrap">${_('report_card_location')}: ${report.location.lat.toFixed(4)}, ${report.location.lon.toFixed(4)}</span>` : '';
-                 const photoHtml = report.photoPath ? `<div class="mt-2"><a href="${report.photoPath}" target="_blank" title="${_('report_card_photo')}"><img src="${report.photoPath}" alt="${_('report_card_photo')} for ${projectName}" class="max-h-32 max-w-full rounded border border-gray-200 shadow-sm" loading="lazy"></a></div>` : '';
-                const reportElement = `
-                    <div class="border-b border-gray-100 pb-3 mb-3 last:border-b-0 last:pb-0 last:mb-0">
-                        <p class="text-sm font-medium text-gray-800 mb-0.5">${projectName}</p>
-                        <p class="text-sm text-gray-700 mb-1 break-words">${report.comment || ''}</p>
-                         ${photoHtml}
-                         <p class="text-xs text-gray-500 mt-1"><span class="whitespace-nowrap">${_('report_card_date')}: ${formattedDate}</span>${locationText}</p>
-                    </div>`;
-                reportsList.innerHTML += reportElement;
-            });
-        }
-
-        // --- Отображение ВСЕХ/ОТФИЛЬТРОВАННЫХ публичных отчетов ---
-        async function displayPublicReports(filterProjectId = null) {
-            const publicReportsList = document.getElementById('public-reports-list');
-            const reportsTitleElement = document.getElementById('public-reports-title');
-            const showAllButton = document.getElementById('show-all-reports-button');
-            publicReportsList.innerHTML = `<p class="text-gray-500 italic p-4">${_('Loading reports...')}</p>`;
-            let isFiltered = false;
-             await loadReports(filterProjectId);
-            let reportsToDisplay = allReportsData;
-
-            if (filterProjectId !== null) {
-                 isFiltered = true;
-                 const project = allProjectsData.find(p => String(p.id) === String(filterProjectId));
-                 const projectName = project ? project.name : `ID ${filterProjectId}`;
-                 reportsTitleElement.textContent = _('public_reports_title_filtered', { projectName: projectName });
-                 showAllButton.classList.remove('hidden');
-             } else {
-                 reportsTitleElement.textContent = _('public_reports_title');
-                 showAllButton.classList.add('hidden');
-             }
-            publicReportsList.innerHTML = '';
-            if (!Array.isArray(reportsToDisplay) || reportsToDisplay.length === 0) {
-                 const messageKey = isFiltered ? 'report_no_reports_for_project' : 'report_no_reports';
-                 publicReportsList.innerHTML = `<p class="text-gray-500 italic p-4">${_(messageKey)}</p>`; return;
-            }
-
-            reportsToDisplay.forEach(report => {
-                 const projectName = getProjectName(report.projectId);
-                 const formattedDate = report.date ? new Date(report.date).toLocaleString(_('locale_code', 'ru-RU'), { dateStyle: 'medium', timeStyle: 'short' }) : 'N/A';
-                 const dateIcon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="icon"><path fill-rule="evenodd" d="M4 1.75a.75.75 0 01.75-.75h6.5a.75.75 0 01.75.75V3h1.75A1.75 1.75 0 0115.5 4.75v8.5A1.75 1.75 0 0113.75 15H2.25A1.75 1.75 0 01.5 13.25v-8.5A1.75 1.75 0 012.25 3H4V1.75zM2 6.25v7A.25.25 0 002.25 13.5h11.5a.25.25 0 00.25-.25v-7H2zM14 4.75a.25.25 0 00-.25-.25H2.25a.25.25 0 00-.25.25V5h12V4.75z" clip-rule="evenodd"></path></svg>`;
-                 const projectIcon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="icon"><path d="M3.75 2a.75.75 0 00-1.5 0v12c0 .414.336.75.75.75h10.5a.75.75 0 00.75-.75V8.75a.75.75 0 00-1.5 0v4.5h-9v-11h3V2H3.75z"></path><path d="M8.75 2a.75.75 0 000 1.5h3.56l-7.22 7.22a.75.75 0 101.06 1.06L13.5 4.31V7.75a.75.75 0 001.5 0V2.75a.75.75 0 00-.75-.75H8.75z"></path></svg>`;
-                 const locationIcon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="icon"><path fill-rule="evenodd" d="M8 1.75a.75.75 0 01.75.75V3a.75.75 0 01-1.5 0V2.5A.75.75 0 018 1.75zM4.75 4.5a.75.75 0 01.75-.75h5.5a.75.75 0 010 1.5h-5.5a.75.75 0 01-.75-.75zM10.75 8a.75.75 0 01-.75.75H6a.75.75 0 010-1.5h4a.75.75 0 01.75.75zM8 11.75a.75.75 0 01.75.75v.5a.75.75 0 01-1.5 0v-.5a.75.75 0 01.75-.75z" clip-rule="evenodd"></path><path d="M3.75 0A1.75 1.75 0 002 1.75v12.5c0 .966.784 1.75 1.75 1.75h8.5A1.75 1.75 0 0014 14.25V1.75A1.75 1.75 0 0012.25 0h-8.5zM3.5 1.75c0-.138.112-.25.25-.25h8.5a.25.25 0 01.25.25v12.5a.25.25 0 01-.25.25h-8.5a.25.25 0 01-.25-.25V1.75z"></path></svg>`;
-                 const locationHtml = report.location ? `<span class="whitespace-nowrap flex items-center">${locationIcon}${_('report_card_location')}: ${report.location.lat.toFixed(4)}, ${report.location.lon.toFixed(4)}</span>` : '';
-                 const photoHtml = report.photoPath ? `<div class="mt-2"><a href="${report.photoPath}" target="_blank" title="${_('report_card_photo')}"><img src="${report.photoPath}" alt="${_('report_card_photo')} for ${projectName}" class="max-h-48 max-w-full rounded border border-gray-300 shadow-sm hover:shadow-md transition-shadow" loading="lazy"></a></div>` : '';
-                 const reportCard = `
-                    <div class="list-card">
-                        <h4>${_('report_card_comment')}:</h4>
-                        <p class="text-gray-800 mb-2 break-words">${report.comment || ''}</p>
-                        ${photoHtml}
-                        <div class="report-card-meta flex flex-wrap items-center gap-x-4 gap-y-1 mt-3">
-                             <span class="whitespace-nowrap flex items-center">${dateIcon}${_('report_card_date')}: ${formattedDate}</span>
-                             <span class="whitespace-nowrap flex items-center">${projectIcon}${_('report_card_project')}: ${projectName}</span>
-                             ${locationHtml || ''}
-                         </div>
-                    </div>`;
-                publicReportsList.innerHTML += reportCard;
-            });
-        }
-
-        // --- Логика переключения секций ---
+        // --- Обновленная Логика переключения секций ---
         async function showSection(sectionId, forceRefreshReports = false) {
+            // Скрываем все основные секции И секции регистрации/теста
             document.querySelectorAll('.content-section').forEach(section => {
                  if (!section.classList.contains('hidden')) {
                      section.classList.add('hidden');
-                     section.style.opacity = 0; section.style.transform = 'translateY(10px)';
+                     // Стили для скрытия (могут быть уже применены через .hidden)
+                     section.style.opacity = 0;
+                     section.style.transform = 'translateY(20px)';
                  }
             });
+
             const sectionToShow = document.getElementById(sectionId);
             if (sectionToShow) {
                  sectionToShow.classList.remove('hidden');
                  requestAnimationFrame(() => { requestAnimationFrame(() => {
-                     sectionToShow.style.opacity = 1; sectionToShow.style.transform = 'translateY(0)';
+                     sectionToShow.style.opacity = 1;
+                     sectionToShow.style.transform = 'translateY(0)';
                  }); });
             }
+
+            // Обновляем активную вкладку (только для основных секций)
             document.querySelectorAll('.tab').forEach(tab => {
                 tab.classList.remove('tab-active');
-                if (tab.dataset.section === sectionId) tab.classList.add('tab-active');
+                 // Добавляем проверку, что data-section вообще существует
+                 if (tab.dataset.section && tab.dataset.section === sectionId) {
+                    tab.classList.add('tab-active');
+                }
             });
+
+            // Действия при открытии секции
             switch (sectionId) {
                 case 'map-section': if (!map) initializeMap(); else setTimeout(() => { if(map) map.invalidateSize() }, 10); break;
                 case 'projects-section': displayProjectsInList(); break;
                 case 'contractors-section': displayContractors(); break;
-                case 'citizen-reports-public-section': await displayPublicReports(forceRefreshReports ? null : undefined); break; // Use undefined to avoid filtering unless forced
+                case 'citizen-reports-public-section': await displayPublicReports(forceRefreshReports ? null : undefined); break;
                 case 'report-section': populateProjectSelect(); displayCitizenReports(); getGeolocation(); break;
+                 // Для quiz и register специфические действия не нужны здесь,
+                 // они вызываются функциями startRegistrationProcess, showQuiz, showRegisterForm
             }
-            if (sectionId !== 'map-section') window.scrollTo({ top: 0, behavior: 'smooth' });
+            if (sectionId !== 'map-section' && sectionId !== 'quiz-section' && sectionId !== 'register-section') {
+                 window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
             closeMobileMenu();
         }
 
-        // --- Показ отчетов по конкретному проекту ---
-        function showProjectReports(projectId) {
-            const projectIdStr = String(projectId);
-            showSection('citizen-reports-public-section', false); // Go to section
-            displayPublicReports(projectIdStr); // Then filter
+        // --- Показ отчетов по проекту ---
+        function showProjectReports(projectId) { const pid = String(projectId); showSection('citizen-reports-public-section', false); displayPublicReports(pid); }
+        // --- Геолокация (без изменений) ---
+        function getGeolocation() { const statusEl=document.getElementById('geolocation-status'),latIn=document.getElementById('report-latitude'),lonIn=document.getElementById('report-longitude'); statusEl.textContent=_( 'report_geolocation_fetching');statusEl.className='text-sm text-gray-500';latIn.value='';lonIn.value=''; if(navigator.geolocation){navigator.geolocation.getCurrentPosition(p=>{latIn.value=p.coords.latitude.toFixed(6);lonIn.value=p.coords.longitude.toFixed(6);statusEl.textContent=`${_('report_geolocation_success')}: ${p.coords.latitude.toFixed(4)}, ${p.coords.longitude.toFixed(4)}`;statusEl.className='text-sm text-green-600';},e=>{console.error("Geo Err:",e.code,e.message);let k='report_geolocation_error'; if(e.code===1)k='report_geolocation_permission_denied';else if(e.code===2)k='report_geolocation_unavailable';else if(e.code===3)k='report_geolocation_timeout'; statusEl.textContent=_(k);statusEl.className='text-sm text-red-600';},{enableHighAccuracy:true,timeout:10000,maximumAge:0});}else{statusEl.textContent=_( 'report_geolocation_unsupported');statusEl.className='text-sm text-red-600';}}
+        // --- Год в подвале ---
+        function updateFooterYear() { document.getElementById('footer-year').textContent = new Date().getFullYear(); }
+        // --- Мобильное меню ---
+        function closeMobileMenu() { document.getElementById('mobile-menu')?.classList.add('hidden'); }
+        // --- Уведомления ---
+        function showMessage(msgKey, type = 'info', duration = 3500) { const box = document.getElementById('message-box'); if (!box) return; let txt = _(msgKey); box.textContent = txt; box.className = `message-box ${type}`; box.style.display = 'none'; void box.offsetWidth; box.style.display = ''; box.classList.add('show'); if (box.timerId) clearTimeout(box.timerId); box.timerId = setTimeout(() => box.classList.remove('show'), duration); }
+
+
+        // --- НОВЫЕ ФУНКЦИИ для Регистрации и Теста ---
+
+        function startRegistrationProcess() {
+             quizPassed = false; // Сбрасываем статус теста
+             showSection('quiz-section'); // Показываем секцию теста
+             showQuiz(); // Загружаем и отображаем вопросы
         }
 
-        // --- Получение геолокации ---
-        function getGeolocation() {
-            const statusElement = document.getElementById('geolocation-status');
-            const latInput = document.getElementById('report-latitude');
-            const lonInput = document.getElementById('report-longitude');
-            statusElement.textContent = _('report_geolocation_fetching');
-            statusElement.className = 'text-sm text-gray-500';
-            latInput.value = ''; lonInput.value = '';
-            if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(
-                    (pos) => {
-                        latInput.value = pos.coords.latitude.toFixed(6);
-                        lonInput.value = pos.coords.longitude.toFixed(6);
-                        statusElement.textContent = `${_('report_geolocation_success')}: ${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)}`;
-                        statusElement.className = 'text-sm text-green-600';
-                    }, (err) => {
-                        console.error("Geolocation error:", err.code, err.message);
-                        let key = 'report_geolocation_error';
-                        if (err.code === 1) key = 'report_geolocation_permission_denied';
-                        else if (err.code === 2) key = 'report_geolocation_unavailable';
-                        else if (err.code === 3) key = 'report_geolocation_timeout';
-                        statusElement.textContent = _(key);
-                        statusElement.className = 'text-sm text-red-600';
-                    }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-                );
+        async function showQuiz() {
+            const container = document.getElementById('quiz-questions-container');
+            container.innerHTML = `<p class="text-center text-gray-500">${_('quiz_loading')}</p>`;
+            currentQuizQuestions = []; // Очищаем предыдущие вопросы
+
+            const questionsData = await fetchData('quiz/questions'); // Запрос к новому API эндпоинту
+
+            if (questionsData && Array.isArray(questionsData) && questionsData.length > 0) {
+                currentQuizQuestions = questionsData;
+                renderQuizQuestions(); // Отображаем вопросы
+                 // Добавляем обработчик на форму теста ТОЛЬКО после загрузки вопросов
+                 const quizForm = document.getElementById('quiz-form');
+                 if (quizForm) {
+                      // Удаляем предыдущий обработчик, если он был
+                      quizForm.replaceWith(quizForm.cloneNode(true)); // Простой способ удалить все обработчики
+                      document.getElementById('quiz-form').addEventListener('submit', submitQuiz);
+                 }
             } else {
-                statusElement.textContent = _('report_geolocation_unsupported');
-                statusElement.className = 'text-sm text-red-600';
+                container.innerHTML = `<p class="text-center text-red-500">${_('quiz_error_loading')}</p>`;
             }
         }
 
-        // --- Обновление года в подвале ---
-        function updateFooterYear() { document.getElementById('footer-year').textContent = new Date().getFullYear(); }
-        // --- Закрытие мобильного меню ---
-        function closeMobileMenu() { document.getElementById('mobile-menu')?.classList.add('hidden'); }
+        // Функция для отрисовки вопросов теста (вызывается из showQuiz)
+        function renderQuizQuestions() {
+             const container = document.getElementById('quiz-questions-container');
+             if (!container || !currentQuizQuestions) return;
+             container.innerHTML = ''; // Очищаем контейнер
 
-        // --- Отображение уведомлений ---
-        function showMessage(messageOrKey, type = 'info', duration = 3500) {
-            const messageBox = document.getElementById('message-box'); if (!messageBox) return;
-            let messageText = _(messageOrKey);
-            messageBox.textContent = messageText;
-            messageBox.className = `message-box ${type}`;
-            messageBox.style.display = 'none'; void messageBox.offsetWidth; messageBox.style.display = ''; messageBox.classList.add('show');
-            if (messageBox.timerId) clearTimeout(messageBox.timerId);
-            messageBox.timerId = setTimeout(() => messageBox.classList.remove('show'), duration);
+             currentQuizQuestions.forEach((q, index) => {
+                 const questionDiv = document.createElement('div');
+                 questionDiv.className = 'mb-4 border-b border-gray-200 pb-4';
+                 questionDiv.innerHTML = `<p class="font-medium mb-2">${index + 1}. ${q.text || ''}</p>`;
+
+                 const optionsDiv = document.createElement('div');
+                 optionsDiv.className = 'space-y-2';
+
+                 q.options?.forEach((option, optIndex) => {
+                     const optionId = `q${q.id}_opt${optIndex}`;
+                     const optionLabel = document.createElement('label');
+                     optionLabel.htmlFor = optionId;
+                     optionLabel.className = 'quiz-option'; // Стилизация через CSS
+                     optionLabel.innerHTML = `
+                         <input type="radio" id="${optionId}" name="q_${q.id}" value="${option}" required>
+                         <span>${option}</span>
+                     `;
+                     optionsDiv.appendChild(optionLabel);
+                 });
+
+                 questionDiv.appendChild(optionsDiv);
+                 container.appendChild(questionDiv);
+             });
         }
+
+
+        async function submitQuiz(event) {
+            event.preventDefault(); // Предотвращаем стандартную отправку
+            const form = event.target;
+            const formData = new FormData(form);
+            const userAnswers = {};
+
+            // Собираем ответы пользователя
+            currentQuizQuestions.forEach(q => {
+                const answer = formData.get(`q_${q.id}`);
+                if (answer) {
+                    userAnswers[q.id] = answer;
+                }
+            });
+
+            // Проверка, на все ли вопросы ответили (простая)
+            if (Object.keys(userAnswers).length !== currentQuizQuestions.length) {
+                showMessage('Пожалуйста, ответьте на все вопросы.', 'error'); // TODO: Translate
+                return;
+            }
+
+            const submitButton = form.querySelector('button[type="submit"]');
+            submitButton.disabled = true;
+            const originalButtonText = submitButton.textContent;
+            submitButton.textContent = _('Submitting...');
+
+            // Отправляем ответы на бэкенд для проверки
+            const result = await sendData('quiz/submit', 'POST', userAnswers);
+
+            submitButton.disabled = false;
+            submitButton.textContent = originalButtonText;
+
+            if (result && result.success) {
+                quizPassed = true; // Устанавливаем флаг
+                showMessage(_('quiz_pass_message'), 'success');
+                showSection('register-section'); // Показываем форму регистрации
+                // Добавляем обработчик на форму регистрации ТОЛЬКО сейчас
+                 const registerForm = document.getElementById('register-form');
+                 if (registerForm) {
+                     registerForm.replaceWith(registerForm.cloneNode(true)); // Удаляем старые обработчики
+                     document.getElementById('register-form').addEventListener('submit', submitRegistration);
+                 }
+
+            } else {
+                quizPassed = false;
+                showMessage(result?.message || _('quiz_fail_message'), 'error');
+            }
+        }
+
+        async function submitRegistration(event) {
+            event.preventDefault();
+            if (!quizPassed) { // Дополнительная проверка
+                showMessage("Сначала необходимо пройти тест.", "error"); // TODO: Translate
+                 // Возможно, перенаправить на тест?
+                 // startRegistrationProcess();
+                return;
+            }
+
+            const form = event.target;
+            const emailInput = form.elements['email'];
+            const passwordInput = form.elements['password'];
+            const confirmPasswordInput = form.elements['confirmPassword'];
+
+            const email = emailInput.value.trim();
+            const password = passwordInput.value;
+            const confirmPassword = confirmPasswordInput.value;
+
+            // Простая валидация на клиенте
+            if (!email || !password || !confirmPassword) {
+                 showMessage(_('message_error_form'), 'error'); // Используем общий ключ
+                 return;
+            }
+            if (password !== confirmPassword) {
+                 showMessage(_('register_error_passwords_mismatch'), 'error');
+                 return;
+            }
+             // Добавить проверку длины пароля, сложности и т.д. при необходимости
+            if (password.length < 6) {
+                showMessage(_('register_password_placeholder'), 'error'); // Сообщение об ошибке из плейсхолдера (пример)
+                 return;
+            }
+
+
+            const submitButton = form.querySelector('button[type="submit"]');
+            submitButton.disabled = true;
+            const originalButtonText = submitButton.textContent;
+            submitButton.textContent = _('Submitting...');
+
+            // Отправляем данные на бэкенд
+            const result = await sendData('users/register', 'POST', { email, password });
+
+            submitButton.disabled = false;
+            submitButton.textContent = originalButtonText;
+
+            if (result && result.success) {
+                 showMessage(_('register_success_message'), 'success');
+                 // Очищаем форму и статус теста
+                 form.reset();
+                 quizPassed = false;
+                 // Переходим на главную или показываем сообщение для входа
+                 showSection('landing-section', true);
+                 // TODO: Можно автоматически показывать форму входа или кнопку "Войти"
+            } else {
+                 // Показываем ошибку от бэкенда или общую
+                 showMessage(result?.message || _('register_error_generic'), 'error');
+            }
+        }
+
 
         // --- ОБРАБОТЧИКИ СОБЫТИЙ ---
 
-        // Отправка формы отчета
-        document.getElementById('report-form').addEventListener('submit', async function(event) {
+        // Отправка формы отчета (без изменений)
+        document.getElementById('report-form').addEventListener('submit', async function(event) { /* ... код как был ... */
              event.preventDefault(); const form = this;
              const submitButton = form.querySelector('button[type="submit"]'), span = submitButton.querySelector('span'), origTxt = span.textContent;
              submitButton.disabled = true; span.textContent = _('Submitting...');
@@ -1028,26 +748,23 @@
                  getGeolocation();
              } catch (error) { console.error("Ошибка отправки:", error); showMessage(error.message || _('Error submitting report. Please try again.'), 'error', 5000);
              } finally { submitButton.disabled = false; span.textContent = origTxt; }
-        });
+         });
 
-        // Поиск проектов
-        document.getElementById('project-search').addEventListener('input', function(e) {
-            const term = e.target.value.toLowerCase().trim(); if (!Array.isArray(allProjectsData)) return;
-            const filtered = allProjectsData.filter(p => (p.name||'').toLowerCase().includes(term) || getContractorName(p.contractorId).toLowerCase().includes(term));
-            displayProjectsInList(filtered);
-        });
-        // Кнопка мобильного меню
+        // Поиск проектов (без изменений)
+        document.getElementById('project-search').addEventListener('input', function(e) { const term = e.target.value.toLowerCase().trim(); if (!Array.isArray(allProjectsData)) return; const filtered = allProjectsData.filter(p => (p.name||'').toLowerCase().includes(term) || getContractorName(p.contractorId).toLowerCase().includes(term)); displayProjectsInList(filtered); });
+        // Кнопка мобильного меню (без изменений)
         document.getElementById('mobile-menu-button').addEventListener('click', () => document.getElementById('mobile-menu')?.classList.toggle('hidden'));
 
-        // --- Инициализация при загрузке страницы ---
+        // --- Инициализация при загрузке страницы (без изменений) ---
         document.addEventListener('DOMContentLoaded', async () => {
              const savedLang = localStorage.getItem('preferredLanguage'), browserLang = navigator.language.split('-')[0];
              const initialLang = savedLang || (languages[browserLang] ? browserLang : 'ru');
              await setLanguage(initialLang);
              try {
-                 await loadInitialData();
+                 await loadInitialData(); // Показывает индикаторы загрузки внутри
+                 // Отображаем данные после загрузки
                  displayProjectsInList(); displayContractors(); populateProjectSelect(); displayCitizenReports(); await displayPublicReports();
-                 showSection('landing-section', false);
+                 showSection('landing-section', false); // Показываем главную секцию
                  getGeolocation(); updateFooterYear();
              } catch (error) {
                  console.error("Ошибка при начальной загрузке:", error);
