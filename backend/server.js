@@ -1,4 +1,4 @@
-// Начинаем с последнего рабочего кода
+// Финальная версия server.js
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
@@ -13,7 +13,7 @@ const DATA_DIR = path.join(__dirname, 'data');
 const UPLOADS_DIR = path.join(__dirname, 'public', 'uploads');
 const PUBLIC_DIR = path.join(__dirname, 'public');
 
-// IIFE для инициализации (оставляем как есть)
+// IIFE для инициализации директорий/файлов (оставляем как есть)
 (async () => {
     try {
         await fs.mkdir(DATA_DIR, { recursive: true }); await fs.mkdir(UPLOADS_DIR, { recursive: true }); await fs.mkdir(PUBLIC_DIR, { recursive: true });
@@ -52,67 +52,28 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Раздача статических файлов (оставляем как есть)
+// Важно: Это должно быть до маршрутов API, если API пути могут пересекаться с именами файлов/папок
+// Но т.к. у нас есть префикс /api/, порядок не так критичен. Оставим здесь.
 app.use(express.static(PUBLIC_DIR));
 app.use('/uploads', express.static(UPLOADS_DIR));
 
-// Маршруты API GET (оставляем как есть)
+// Маршруты API (оставляем как есть)
 app.get('/api/projects', async (req, res) => { try { const projects = await readData('projects.json'); res.json(projects); } catch (error) { res.status(500).json({ message: "Ошибка получения списка проектов", error: error.message }); } });
 app.get('/api/contractors', async (req, res) => { try { const contractors = await readData('contractors.json'); res.json(contractors); } catch (error) { res.status(500).json({ message: "Ошибка получения списка подрядчиков", error: error.message }); } });
 app.get('/api/reports', async (req, res) => { try { const { projectId } = req.query; let reports = await readData('reports.json'); if (projectId) { reports = reports.filter(report => String(report.projectId) === String(projectId)); } reports.sort((a, b) => new Date(b.date) - new Date(a.date)); res.json(reports); } catch (error) { res.status(500).json({ message: "Ошибка получения списка отчетов", error: error.message }); } });
+app.post('/api/reports', upload.single('report-photo'), async (req, res) => { try { const { projectId, comment, latitude, longitude } = req.body; if (!projectId || !comment || comment.trim() === '') { if (req.file) { await fs.unlink(req.file.path).catch(err => console.error("Ошибка удаления файла:", err)); } return res.status(400).json({ message: "ID проекта и комментарий обязательны." }); } let allReports = await readData('reports.json'); let allProjects = await readData('projects.json'); const newReport = { id: uuidv4(), projectId: projectId, comment: comment.trim(), date: new Date().toISOString(), photoPath: req.file ? `/uploads/${req.file.filename}` : null, location: (latitude && longitude && !isNaN(latitude) && !isNaN(longitude)) ? { lat: parseFloat(latitude), lon: parseFloat(longitude) } : null }; allReports.push(newReport); await writeData('reports.json', allReports); const projectIndex = allProjects.findIndex(p => String(p.id) === String(projectId)); let updatedProject = null; if (projectIndex !== -1) { const project = allProjects[projectIndex]; const projectReports = allReports.filter(r => String(r.projectId) === String(projectId)); let alertLevel = 0; if (project.status === "Завершено" && projectReports.length >= 1) alertLevel = 1; else if (project.status === "В процессе" && projectReports.length > 3) alertLevel = 2; else if (project.status === "В процессе" && projectReports.length >= 1) alertLevel = 1; if (project.citizenAlertLevel !== alertLevel) { allProjects[projectIndex].citizenAlertLevel = alertLevel; await writeData('projects.json', allProjects); updatedProject = allProjects[projectIndex]; console.log(`Обновлен уровень тревоги для проекта ${projectId} на ${alertLevel}`); } else { updatedProject = project; } } res.status(201).json({ report: newReport, updatedProject: updatedProject }); } catch (error) { console.error("Ошибка при отправке отчета:", error); if (req.file) { await fs.unlink(req.file.path).catch(err => console.error("Ошибка удаления файла:", err)); } if (error instanceof multer.MulterError) return res.status(400).json({ message: "Ошибка загрузки файла", error: error.message }); else if (error.message.includes('Недопустимый тип файла')) return res.status(400).json({ message: error.message }); res.status(500).json({ message: "Внутренняя ошибка сервера при отправке отчета", error: error.message }); } });
 
 
-// --->>> Добавили Маршрут API POST <<<---
-app.post('/api/reports', upload.single('report-photo'), async (req, res) => {
-    try {
-        const { projectId, comment, latitude, longitude } = req.body;
-        if (!projectId || !comment || comment.trim() === '') {
-             // Важно: Удаляем файл, если он был загружен, но валидация не прошла
-             if (req.file) { await fs.unlink(req.file.path).catch(err => console.error("Ошибка удаления файла при валидации:", err)); }
-            return res.status(400).json({ message: "ID проекта и комментарий обязательны." });
-        }
-        let allReports = await readData('reports.json');
-        let allProjects = await readData('projects.json');
-        const newReport = {
-            id: uuidv4(), projectId: projectId, comment: comment.trim(), date: new Date().toISOString(),
-            photoPath: req.file ? `/uploads/${req.file.filename}` : null,
-            location: (latitude && longitude && !isNaN(latitude) && !isNaN(longitude)) ? { lat: parseFloat(latitude), lon: parseFloat(longitude) } : null
-        };
-        allReports.push(newReport);
-        await writeData('reports.json', allReports);
-
-        // Симуляция AI
-        const projectIndex = allProjects.findIndex(p => String(p.id) === String(projectId));
-        let updatedProject = null;
-        if (projectIndex !== -1) {
-            const project = allProjects[projectIndex];
-            const projectReports = allReports.filter(r => String(r.projectId) === String(projectId));
-            let alertLevel = 0;
-            if (project.status === "Завершено" && projectReports.length >= 1) alertLevel = 1;
-            else if (project.status === "В процессе" && projectReports.length > 3) alertLevel = 2; // Пример порога
-            else if (project.status === "В процессе" && projectReports.length >= 1) alertLevel = 1;
-
-            if (project.citizenAlertLevel !== alertLevel) {
-                allProjects[projectIndex].citizenAlertLevel = alertLevel;
-                await writeData('projects.json', allProjects);
-                updatedProject = allProjects[projectIndex];
-                console.log(`Обновлен уровень тревоги для проекта ${projectId} на ${alertLevel}`);
-            } else { updatedProject = project; } // Возвращаем текущий проект, если уровень не изменился
-        }
-        res.status(201).json({ report: newReport, updatedProject: updatedProject }); // Возвращаем созданный отчет
-
-    } catch (error) {
-        console.error("Ошибка при отправке отчета:", error);
-         // Важно: Удаляем файл, если он был загружен, но произошла ошибка при обработке
-         if (req.file) { await fs.unlink(req.file.path).catch(err => console.error("Ошибка удаления файла при обработке:", err)); }
-        if (error instanceof multer.MulterError) return res.status(400).json({ message: "Ошибка загрузки файла", error: error.message });
-        else if (error.message.includes('Недопустимый тип файла')) return res.status(400).json({ message: error.message });
-        res.status(500).json({ message: "Внутренняя ошибка сервера при отправке отчета", error: error.message });
-    }
+// --->>> Добавили Catch-All обработчик <<<---
+// ВАЖНО: Размещать после всех API маршрутов и статики
+app.get('*', (req, res) => {
+    // Отправляем основной HTML файл для всех запросов,
+    // не совпавших с API или статическими файлами выше
+    res.sendFile(path.join(PUBLIC_DIR, 'index.html'));
 });
-// ----------------------------------
+// ----------------------------------------
 
-// --- Catch-All пока НЕ ДОБАВЛЕН ---
-
+// Запуск сервера (оставляем как есть)
 app.listen(PORT, () => {
-  console.log(`Server with GET/POST routes running on port ${PORT}`); // Обновили лог
+  console.log(`Server is fully running on port ${PORT}`); // Финальное сообщение
 });
