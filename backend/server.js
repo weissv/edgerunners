@@ -73,15 +73,20 @@ console.log("Определение POST /api/reports...");
 app.post('/api/reports', upload.single('report-photo'), async (req, res) => { /* ... код ... */ });
 console.log("Маршруты API определены");
 
-// --->>> ВРЕМЕННО ЗАКОММЕНТИРОВАЛИ Catch-All обработчик для теста <<<---
-// console.log("Определение GET * ...");
-// app.get('*', (req, res) => {
-//     console.log(`Обработчик GET * сработал для пути: ${req.path}`); // Добавим лог сюда
-//     res.sendFile(path.join(PUBLIC_DIR, 'index.html'));
-// });
-// console.log("Catch-all обработчик определен");
+// --->>> Пробуем АЛЬТЕРНАТИВНЫЙ Catch-All обработчик <<<---
+console.log("Определение GET /* ...");
+app.get('/*', (req, res) => { // Используем '/*' вместо '*'
+    console.log(`Обработчик GET /* сработал для пути: ${req.path}`);
+    // Отдаем index.html только если это не API и не статический файл (простая проверка)
+    if (!req.path.startsWith('/api/') && !req.path.startsWith('/uploads/') && !req.path.includes('.')) {
+        res.sendFile(path.join(PUBLIC_DIR, 'index.html'));
+    } else {
+        // Для API или файлов отдаем 404 (или передаем дальше, если есть другие обработчики)
+        res.status(404).send('Not Found'); // Или next() если нужно
+    }
+});
+console.log("Альтернативный Catch-all обработчик определен");
 // ---------------------------------------------------------
-
 // Запуск сервера (оставляем как есть)
 console.log("Запуск сервера...");
 app.listen(PORT, () => {
