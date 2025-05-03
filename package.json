@@ -16,5 +16,11 @@
   "bugs": {
     "url": "https://github.com/weissv/edgerunners/issues"
   },
-  "homepage": "https://github.com/weissv/edgerunners#readme"
+  "homepage": "https://github.com/weissv/edgerunners#readme",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "multer": "^1.4.5-lts.2",
+    "uuid": "^11.1.0"
+  }
 }
