@@ -1,36 +1,167 @@
 <!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
-    <title>Document</title>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Face Recognition System - Remix Dossier</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;700&display=swap" rel="stylesheet">
     <style>
-      body {
-        margin: 0;
-        padding: 0;
-        width: 100vw;
-        height: 100vh;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-      }
+        :root {
+            --dark-bg: #0D1117;
+            --card-bg: #161B22;
+            --border-color: #30363D;
+            --text-primary: #C9D1D9;
+            --text-secondary: #8B949E;
+            --accent-blue: #58A6FF;
+            --accent-purple: #A855F7;
+            --accent-gradient: linear-gradient(to right, #3B82F6, #A855F7);
+        }
 
-      canvas {
-        position: absolute;
-        z-index: 9999; /* ensure canvas appears on top */
-      }
+        body {
+            background-color: var(--dark-bg);
+            color: var(--text-primary);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 0;
+            padding: 40px 20px;
+            min-height: 100vh;
+            box-sizing: border-box;
+            background-image: radial-gradient(circle at 1px 1px, rgba(200, 200, 200, 0.05) 1px, transparent 0);
+            background-size: 25px 25px;
+        }
 
-      img {
-        max-width: 45%;
-      }
+        h1 {
+            color: var(--text-primary); font-weight: 500; letter-spacing: 0.5px;
+            border-bottom: 1px solid var(--border-color); padding-bottom: 15px;
+            margin-bottom: 40px; font-size: 1.8em;
+        }
+
+        #videoContainer {
+            position: relative; width: 720px; height: 560px;
+            border: 1px solid var(--border-color); border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3), 0 0 0 1px var(--border-color);
+            background-color: #000; overflow: hidden;
+        }
+
+        video, canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border-radius: 12px; }
+        canvas { z-index: 10; }
+
+        /* Общие стили для всплывающих панелей */
+        .info-panel {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: var(--card-bg);
+            padding: 35px 45px;
+            border-radius: 12px;
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.5);
+            z-index: 100;
+            width: 400px; /* Немного шире */
+            display: none;
+            border: 1px solid var(--border-color);
+            transition: opacity 0.3s ease, transform 0.3s ease;
+        }
+        .info-panel h2 {
+            margin-top: 0; color: var(--text-primary); text-align: center;
+            font-weight: 500; margin-bottom: 30px; font-size: 1.5em;
+        }
+        .info-panel label, .info-panel .dossier-label {
+            display: block; margin-bottom: 6px; color: var(--text-secondary);
+            font-size: 0.9em; font-weight: 500;
+        }
+        .info-panel input, .info-panel select {
+            width: 100%; padding: 12px 15px; margin-bottom: 18px;
+            border: 1px solid var(--border-color); border-radius: 6px;
+            background-color: var(--dark-bg); color: var(--text-primary);
+            box-sizing: border-box; font-size: 1em;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        .info-panel input:focus, .info-panel select:focus {
+            border-color: var(--accent-blue); outline: none;
+            box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.2);
+        }
+        .info-panel input[readonly] { background-color: #20252C; cursor: not-allowed; color: var(--text-secondary); }
+        .info-panel .button-group { display: flex; justify-content: flex-end; margin-top: 20px; }
+        .info-panel button {
+            padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer;
+            font-size: 1em; font-weight: 500; transition: all 0.2s ease; margin-left: 10px;
+        }
+        .info-panel button.save, .info-panel button.action {
+            background: var(--accent-gradient); color: white;
+            box-shadow: 0 4px 15px rgba(88, 166, 255, 0.2);
+        }
+        .info-panel button.save:hover, .info-panel button.action:hover { opacity: 0.9; transform: translateY(-1px); box-shadow: 0 6px 20px rgba(88, 166, 255, 0.3); }
+        .info-panel button.close { background-color: var(--border-color); color: var(--text-primary); }
+        .info-panel button.close:hover { background-color: #484F58; }
+
+        /* Стили для данных в досье */
+        #dossierDisplayPanel .dossier-field { margin-bottom: 15px; }
+        #dossierDisplayPanel .dossier-value {
+            display: block; background-color: var(--dark-bg); color: var(--text-primary);
+            padding: 10px 15px; border-radius: 6px; border: 1px solid var(--border-color);
+            font-size: 1em; word-wrap: break-word;
+        }
+        #dossierDisplayPanel ul {
+            list-style: none; padding-left: 0; margin-top: 5px;
+            max-height: 150px; overflow-y: auto;
+            background-color: var(--dark-bg); border: 1px solid var(--border-color); border-radius: 6px; padding: 10px;
+        }
+        #dossierDisplayPanel li {
+            padding: 8px; margin-bottom: 5px; background-color: #20252C; border-radius: 4px;
+            font-size: 0.9em;
+        }
+         #dossierDisplayPanel li span { display: block; font-size: 0.8em; color: var(--text-secondary); margin-top: 3px;}
+
+
+        #statusText {
+            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+            color: #FACC15; font-size: 1em; background-color: rgba(22, 27, 34, 0.8);
+            padding: 8px 15px; border-radius: 6px; z-index: 150;
+            border: 1px solid var(--border-color); backdrop-filter: blur(5px);
+        }
     </style>
-  </head>
-  <body>
-    <!-- <video id="video" width="720" height="560" autoplay unmuted src="./images/IMG_1280.MOV" controls></video> -->
-    <canvas id="canvas"></canvas>
-    <!-- <img id="face" src="./images/oldMan1.png" /> -->
-    <script src="./face-api.min.js"></script>
-    <script src="scripts.js"></script>
-  </body>
+</head>
+<body>
+    <h1>Face Recognition System</h1>
+    <div id="videoContainer">
+        </div>
+    <div id="statusText">Инициализация системы...</div>
+
+    <div id="registrationForm" class="info-panel">
+        <h2>Новый Клиент</h2>
+        <label for="clientId">ID Клиента:</label> <input type="text" id="clientId" name="clientId" readonly>
+        <label for="visitTime">Время визита:</label> <input type="text" id="visitTime" name="visitTime" readonly>
+        <label for="clientName">Имя:</label> <input type="text" id="clientName" name="clientName" required>
+        <label for="clientAge">Возраст:</label> <input type="number" id="clientAge" name="clientAge" required>
+        <label for="clientGender">Пол:</label> <select id="clientGender" name="clientGender"> <option value="male">Мужской</option> <option value="female">Женский</option> <option value="unknown">Не определен</option> </select>
+        <label for="clientPhone">Номер телефона:</label> <input type="tel" id="clientPhone" name="clientPhone">
+        <label for="clientPurpose">Цель визита:</label> <input type="text" id="clientPurpose" name="clientPurpose" required>
+        <div class="button-group">
+            <button type="button" class="close" id="closeRegFormButton">Закрыть</button>
+            <button type="button" class="save" id="saveRegFormButton">Сохранить (Симуляция)</button>
+        </div>
+    </div>
+
+    <div id="dossierDisplayPanel" class="info-panel">
+        <h2>Досье Клиента</h2>
+        <div class="dossier-field"> <label class="dossier-label">ID:</label> <span id="dossierId" class="dossier-value">-</span> </div>
+        <div class="dossier-field"> <label class="dossier-label">Имя:</label> <span id="dossierName" class="dossier-value">-</span> </div>
+        <div class="dossier-field"> <label class="dossier-label">Возраст:</label> <span id="dossierAge" class="dossier-value">-</span> </div>
+        <div class="dossier-field"> <label class="dossier-label">Пол:</label> <span id="dossierGender" class="dossier-value">-</span> </div>
+        <div class="dossier-field"> <label class="dossier-label">Телефон:</label> <span id="dossierPhone" class="dossier-value">-</span> </div>
+        <div class="dossier-field"> <label class="dossier-label">Client ID:</label> <span id="dossierClientIdDisplay" class="dossier-value">-</span> </div>
+        <div class="dossier-field"> <label class="dossier-label">История визитов:</label> <ul id="dossierVisitHistory"><li>-</li></ul> </div>
+        <div class="button-group">
+            <button type="button" class="close" id="closeDossierButton">Закрыть</button>
+        </div>
+    </div>
+
+    <script defer src="face-api.min.js"></script>
+    <script defer src="scripts.js"></script>
+</body>
 </html>

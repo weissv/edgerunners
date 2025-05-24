@@ -1,0 +1,41 @@
+[
+  {
+    "label": "Andrey_Fedorovich",
+    "id": "AF001",
+    "name": "Андрей Федорович",
+    "age": 45,
+    "gender": "Мужской",
+    "phoneNumber": "+7-916-123-45-67",
+    "clientId": "CUST-AF-001",
+    "visitSchedule": [
+      { "visitId": "V001", "entryTime": "2025-05-24 10:00:00", "exitTime": "2025-05-24 11:30:00", "purpose": "Деловая встреча" },
+      { "visitId": "V005", "entryTime": "2025-05-25 09:00:00", "exitTime": null, "purpose": "Консультация" }
+    ]
+  },
+  {
+    "label": "Miron_Fedorov",
+    "id": "MF001",
+    "name": "Мирон Федоров",
+    "age": 38,
+    "gender": "Мужской",
+    "phoneNumber": "+7-926-987-65-43",
+    "clientId": "CUST-MF-001",
+    "visitSchedule": [
+      { "visitId": "V002", "entryTime": "2025-05-23 15:00:00", "exitTime": "2025-05-23 15:45:00", "purpose": "Подписание контракта" },
+      { "visitId": "V006", "entryTime": "2025-05-25 11:00:00", "exitTime": null, "purpose": "Интервью" }
+    ]
+  },
+  {
+    "label": "Al_Pacino",
+    "id": "AP001",
+    "name": "Аль Пачино",
+    "age": 85,
+    "gender": "Мужской",
+    "phoneNumber": "+1-212-555-1940",
+    "clientId": "CUST-AP-001",
+    "visitSchedule": [
+      { "visitId": "V003", "entryTime": "2025-05-20 12:00:00", "exitTime": "2025-05-20 14:00:00", "purpose": "Кинопробы 'Крестный Отец IV'" },
+      { "visitId": "V004", "entryTime": "2025-05-24 11:00:00", "exitTime": null, "purpose": "Встреча с Ф.Ф. Копполой" }
+    ]
+  }
+]
