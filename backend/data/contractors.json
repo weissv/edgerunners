@@ -1,5 +1,0 @@
-[
-    { "id": "101", "name": "ООО 'СтройМастер'", "rating": 4.2, "projectsCompleted": 5 },
-    { "id": "102", "name": "АО 'МегаСтрой'", "rating": 4.8, "projectsCompleted": 12 },
-    { "id": "103", "name": "ЧП 'Крепкий Дом'", "rating": 3.5, "projectsCompleted": 2 }
-  ]

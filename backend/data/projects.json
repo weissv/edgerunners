@@ -1,6 +1,0 @@
-[
-    { "id": "1", "name": "Ремонт дороги ул. Амира Темура", "location": [41.3111, 69.2797], "budget": "500 млн сум", "deadline": "2025-08-30", "contractorId": "101", "status": "В процессе", "docs": "Смета_Дорога_АТ.pdf", "officialReport": "Выполнено 50% асфальтирования.", "citizenAlertLevel": 0 },
-    { "id": "2", "name": "Строительство школы №123", "location": [41.2995, 69.2401], "budget": "2 млрд сум", "deadline": "2026-01-15", "contractorId": "102", "status": "Планируется", "docs": "Проект_Школа_123.pdf", "officialReport": "Подготовка площадки.", "citizenAlertLevel": 0 },
-    { "id": "3", "name": "Реконструкция поликлиники №5", "location": [41.3333, 69.3333], "budget": "1.2 млрд сум", "deadline": "2025-11-01", "contractorId": "101", "status": "Завершено", "docs": "Акт_Приемки_Поликлиника_5.pdf", "officialReport": "Объект сдан в эксплуатацию.", "citizenAlertLevel": 0 },
-    { "id": "4", "name": "Благоустройство парка 'Навруз'", "location": [41.3050, 69.2600], "budget": "800 млн сум", "deadline": "2025-06-30", "contractorId": "103", "status": "Завершено", "docs": "Отчет_Парк_Навруз.pdf", "officialReport": "Работы завершены согласно графику.", "citizenAlertLevel": 0 }
-  ]
