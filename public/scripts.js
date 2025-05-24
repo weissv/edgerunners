@@ -1,11 +1,10 @@
 window.addEventListener('DOMContentLoaded', () => {
 
-    console.log("DOM готов. Запускаем скрипт v3.2 Remix Dossier (Полный)...");
+    console.log("DOM готов. Запускаем скрипт v4.0 Multi-Track (Хакатон)...");
 
     // --- Элементы DOM ---
     const videoContainer = document.getElementById("videoContainer");
     const statusText = document.getElementById("statusText");
-    // Форма регистрации
     const registrationForm = document.getElementById("registrationForm");
     const clientIdInput = document.getElementById("clientId");
     const visitTimeInput = document.getElementById("visitTime");
@@ -16,7 +15,6 @@ window.addEventListener('DOMContentLoaded', () => {
     const clientPurposeInput = document.getElementById("clientPurpose");
     const saveRegFormButton = document.getElementById("saveRegFormButton");
     const closeRegFormButton = document.getElementById("closeRegFormButton");
-    // Панель досье
     const dossierDisplayPanel = document.getElementById("dossierDisplayPanel");
     const dossierId = document.getElementById("dossierId");
     const dossierName = document.getElementById("dossierName");
@@ -27,411 +25,391 @@ window.addEventListener('DOMContentLoaded', () => {
     const dossierVisitHistory = document.getElementById("dossierVisitHistory");
     const closeDossierButton = document.getElementById("closeDossierButton");
 
-    // Проверка наличия всех элементов
-    const allElements = { videoContainer, statusText, registrationForm, clientIdInput, visitTimeInput, clientNameInput, clientAgeInput, clientGenderInput, clientPhoneInput, clientPurposeInput, saveRegFormButton, closeRegFormButton, dossierDisplayPanel, dossierId, dossierName, dossierAge, dossierGender, dossierPhone, dossierClientIdDisplay, dossierVisitHistory, closeDossierButton };
-    for (const key in allElements) {
-        if (!allElements[key]) {
-            console.error(`CRITICAL ERROR: Element with ID '${key}' not found!`);
-            alert(`Критическая ошибка: Элемент '${key}' не найден. Проверьте index.html.`);
-            return;
-        }
-    }
-    console.log("Элементы DOM успешно найдены.");
+    // Проверка элементов
+    const allElements = { /* ... (как у вас) ... */ };
+    // ... (код проверки) ...
 
     const video = document.createElement("video");
     video.autoplay = true; video.muted = true; video.width = 720; video.height = 560;
     videoContainer.appendChild(video);
-    console.log("Видео элемент создан и добавлен.");
 
     let canvas;
     let clientDataMap = new Map();
     let labels = [];
     let faceMatcher = null;
     let detectionInterval = null;
-    let unknownFaceState = {
-        tracking: false, startTime: null, descriptor: null, ageReadings: [],
-        genderReadings: [], stabilizedAge: null, stabilizedGender: null,
-        formShown: false, box: null, detectionData: null
+
+    // --- НОВЫЕ ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ---
+    let activeClients = new Map(); // Карта для отслеживания всех активных клиентов
+    const INACTIVITY_TIMEOUT = 10000; // 10 секунд отсутствия = клиент ушел
+    const ZONE_THRESHOLD = 3000;    // 3 секунды в зоне = интерес
+    let sessionCounter = 0;         // Счетчик для уникальных ID неизвестных
+    let isFormOpen = false;         // Флаг: открыта ли форма регистрации
+    let isDossierOpen = false;      // Флаг: открыто ли досье
+    let formLinkedClientId = null;  // С каким ID связана открытая форма
+
+    // --- ЗОНЫ ИНТЕРЕСА (НАСТРОЙТЕ ЭТИ КООРДИНАТЫ!) ---
+    const interestZones = {
+        'Model_S': { x1: 50, y1: 100, x2: 250, y2: 400, name: 'Седан "Элегант"' },
+        'Model_X': { x1: 450, y1: 100, x2: 670, y2: 400, name: 'Внедорожник "Простор"' },
+        'Model_3': { x1: 260, y1: 300, x2: 440, y2: 500, name: 'Спорткар "Скорость"' }
     };
-    let dossierShownForLabel = null;
 
-    const ANALYSIS_TIME = 1000; // 1 секунда
-    const FORM_DELAY = 1000;    // 1 секунда
+    const REGISTRATION_DELAY = 5000; // 5 секунд задержки перед показом формы
 
+    // Проверка faceapi
     if (typeof faceapi === 'undefined') {
         console.error("КРИТИЧЕСКАЯ ОШИБКА: Библиотека face-api.min.js не загружена!");
         statusText.innerText = "ОШИБКА: face-api.js не найден!";
-        alert("Не удалось загрузить face-api.min.js. Проверьте путь к файлу в index.html и его наличие.");
         return;
     }
-    console.log("Библиотека faceapi найдена.");
 
     // --- Вспомогательные функции ---
-    function calculateMedian(arr) {
-        if (arr.length === 0) return null;
-        const sorted = arr.slice().sort((a, b) => a - b);
-        const mid = Math.floor(sorted.length / 2);
-        return sorted.length % 2 !== 0 ? sorted[mid] : Math.round((sorted[mid - 1] + sorted[mid]) / 2);
+    function calculateMedian(arr) { /* ... (как у вас) ... */ }
+    function calculateMode(arr) { /* ... (как у вас) ... */ }
+    function generateClientId() { return `NEW-${Date.now().toString().slice(-6)}`; }
+
+    // --- НОВЫЕ Функции для отслеживания ---
+    function createClientState(label, descriptor, detection, isKnown = false) {
+        const now = Date.now();
+        return {
+            id: label,
+            descriptor: descriptor,
+            isKnown: isKnown,
+            entryTime: now,
+            lastSeen: now,
+            timeSpent: 0,
+            currentZone: null,
+            zoneEntryTime: null,
+            viewedModels: new Map(), // Модель -> Время (мс)
+            age: detection.age ? Math.round(detection.age) : '?',
+            gender: detection.gender || '?',
+            box: detection.detection.box,
+            emotionsHistory: [], // История сырых данных эмоций
+            dominantEmotion: 'neutral',
+            registrationTriggered: false, // Флаг, что форма для него уже была вызвана
+        };
     }
 
-    function calculateMode(arr) {
-        if (arr.length === 0) return null;
-        const modeMap = {};
-        let maxCount = 0;
-        let mode = arr[0];
-        arr.forEach(val => {
-            modeMap[val] = (modeMap[val] || 0) + 1;
-            if (modeMap[val] > maxCount) {
-                maxCount = modeMap[val];
-                mode = val;
+    function checkZone(box, zones) {
+        const centerX = box.x + box.width / 2;
+        const centerY = box.y + box.height / 2;
+        for (const zoneName in zones) {
+            const zone = zones[zoneName];
+            if (centerX >= zone.x1 && centerX <= zone.x2 && centerY >= zone.y1 && centerY <= zone.y2) {
+                return zoneName;
             }
-        });
-        return mode;
+        }
+        return null;
     }
 
-    function generateClientId() {
-        return `NEW-${Date.now().toString().slice(-6)}`;
+    function drawZones(ctx, zones) {
+        ctx.strokeStyle = 'rgba(255, 255, 0, 0.6)';
+        ctx.lineWidth = 1;
+        ctx.font = '13px Inter';
+        ctx.fillStyle = 'rgba(255, 255, 0, 0.8)';
+        for (const zoneName in zones) {
+            const z = zones[zoneName];
+            ctx.strokeRect(z.x1, z.y1, z.x2 - z.x1, z.y2 - z.y1);
+            ctx.fillText(zones[zoneName].name, z.x1 + 5, z.y1 + 15);
+        }
     }
-    console.log("Вспомогательные функции определены.");
+
+    function drawClientInfo(ctx, box, client) {
+        const lines = [];
+        const name = client.isKnown
+            ? (clientDataMap.get(client.id)?.name || client.id)
+            : `Клиент ${client.id.split('_')[1]}`;
+        const genderMap = { 'male': 'М', 'female': 'Ж', '?': '?' };
+        lines.push(`${name} (${genderMap[client.gender]}, ~${client.age})`);
+
+        const timeInSalon = ((Date.now() - client.entryTime) / 1000).toFixed(0);
+        lines.push(`Время: ${timeInSalon} сек`);
+
+        if (client.currentZone) {
+            lines.push(`Зона: ${interestZones[client.currentZone].name}`);
+        }
+
+        // Показать доминирующую эмоцию
+        if (client.emotionsHistory.length > 0) {
+           let dominant = 'neutral';
+           let maxProb = 0.5; // Порог для отображения
+           const lastEmotions = client.emotionsHistory[client.emotionsHistory.length - 1];
+           for(const [emo, prob] of Object.entries(lastEmotions)) {
+               if(prob > maxProb) {
+                   maxProb = prob;
+                   dominant = emo;
+               }
+           }
+           lines.push(`Эмоция: ${dominant}`);
+        }
+
+        new faceapi.draw.DrawTextField(lines, box.topLeft, {
+            backgroundColor: 'rgba(22, 27, 34, 0.8)',
+            fontColor: '#C9D1D9',
+            fontSize: 13,
+            padding: 6
+        }).draw(ctx);
+    }
+
+    function sendClientDataToServer(client) {
+        const viewed = {};
+        client.viewedModels.forEach((time, model) => {
+            viewed[model] = (time / 1000).toFixed(1);
+        });
+
+        console.log("ОТПРАВКА ДАННЫХ (Симуляция):", {
+            id: client.id,
+            known: client.isKnown,
+            age: client.age,
+            gender: client.gender,
+            entryTime: new Date(client.entryTime).toLocaleString('ru-RU'),
+            exitTime: new Date().toLocaleString('ru-RU'),
+            timeSpentSeconds: (client.timeSpent / 1000).toFixed(0),
+            viewedModels: viewed,
+        });
+        // fetch('/api/client-visit', { method: 'POST', body: JSON.stringify(...) });
+    }
 
     // --- Функции для работы с формой ---
-    function showRegistrationForm(age, gender) {
-        console.log("ВЫЗОВ: showRegistrationForm()");
-        hideDossier();
-        clientIdInput.value = generateClientId();
+    function showRegistrationForm(age, gender, clientId) {
+        if (isFormOpen || isDossierOpen) return; // Не открывать, если что-то уже открыто
+
+        console.log(`ВЫЗОВ: showRegistrationForm() для ${clientId}`);
+        isFormOpen = true;
+        formLinkedClientId = clientId; // Связываем форму с ID
+
+        clientIdInput.value = clientId; // Используем temp ID или настоящий
         visitTimeInput.value = new Date().toLocaleString('ru-RU');
         clientAgeInput.value = age || '';
         clientGenderInput.value = gender || 'unknown';
         clientNameInput.value = ''; clientPhoneInput.value = ''; clientPurposeInput.value = '';
         registrationForm.style.display = 'block';
-        unknownFaceState.formShown = true;
-        if (detectionInterval) clearInterval(detectionInterval);
-        detectionInterval = null;
+        // Не останавливаем интервал, чтобы видеть других
     }
 
     function hideRegistrationForm() {
         console.log("ВЫЗОВ: hideRegistrationForm()");
         registrationForm.style.display = 'none';
-        unknownFaceState.formShown = false;
-        resetUnknownFaceState();
-        if (!detectionInterval) { startDetection(); }
+        isFormOpen = false;
+        formLinkedClientId = null;
+        // Не сбрасываем клиента, он может быть еще в кадре
     }
 
     saveRegFormButton.addEventListener('click', () => {
+        const idToSave = clientIdInput.value;
         const newData = {
-            id: clientIdInput.value, name: clientNameInput.value, age: clientAgeInput.value,
+            id: generateClientId(), // Генерируем новый ID для БД
+            label: clientNameInput.value || idToSave, // Используем имя как метку (или старый ID)
+            name: clientNameInput.value, age: clientAgeInput.value,
             gender: clientGenderInput.value, phoneNumber: clientPhoneInput.value,
-            clientId: clientIdInput.value,
+            clientId: idToSave, // Сохраняем временный ID для связи
             visitSchedule: [{ visitId: `V-${Date.now()}`, entryTime: visitTimeInput.value, exitTime: null, purpose: clientPurposeInput.value }]
         };
+
         console.log("Сохранение нового клиента (СИМУЛЯЦИЯ):", newData);
-        alert(`Клиент ${newData.name} (ID: ${newData.id}) условно сохранен! Проверьте консоль.\n\n(РЕАЛЬНОЕ СОХРАНЕНИЕ ТРЕБУЕТ БЭКЕНДА!)`);
+        alert(`Клиент ${newData.name} условно сохранен! \n(ТРЕБУЕТСЯ БЭКЕНД И ПЕРЕЗАГРУЗКА ДЛЯ РАСПОЗНАВАНИЯ)`);
+
+        // В идеале: обновить clientDataMap, labels, faceMatcher (сложно)
+        // Пока просто закрываем форму и, если клиент еще тут, он будет "известным" (условно)
+        const client = activeClients.get(idToSave);
+        if (client) {
+            client.isKnown = true;
+            client.id = newData.label; // Меняем ID на имя (для примера)
+            client.needsRegistration = false;
+            clientDataMap.set(newData.label, newData); // Добавляем в карту
+            activeClients.delete(idToSave); // Удаляем старый
+            activeClients.set(newData.label, client); // Добавляем новый
+            console.log(`Клиент ${idToSave} обновлен до ${newData.label}`);
+        }
         hideRegistrationForm();
     });
     closeRegFormButton.addEventListener('click', hideRegistrationForm);
-    console.log("Обработчики кнопок формы регистрации добавлены.");
 
     // --- Функции для досье ---
     function showDossier(clientInfo) {
-        if (!clientInfo) return;
-        // Не показываем, если уже показано для этого же клиента
-        if (dossierDisplayPanel.style.display === 'block' && dossierShownForLabel === clientInfo.label) return;
+        if (!clientInfo || isFormOpen || isDossierOpen) return; // Не открывать, если что-то открыто
 
         console.log(`ВЫЗОВ: showDossier() для ${clientInfo.label}`);
-        hideRegistrationForm(); // Скрываем форму регистрации, если открыта
-
+        isDossierOpen = true;
         dossierId.textContent = clientInfo.id || '-';
         dossierName.textContent = clientInfo.name || '-';
-        dossierAge.textContent = clientInfo.age || '-';
-        dossierGender.textContent = clientInfo.gender === 'male' ? 'Мужской' : (clientInfo.gender === 'female' ? 'Женский' : 'Не указан');
-        dossierPhone.textContent = clientInfo.phoneNumber || '-';
-        dossierClientIdDisplay.textContent = clientInfo.clientId || '-';
-
-        if (clientInfo.visitSchedule && clientInfo.visitSchedule.length > 0) {
-            dossierVisitHistory.innerHTML = clientInfo.visitSchedule.map(v =>
-                `<li>${v.purpose} <span>${v.entryTime}</span></li>`
-            ).join('');
-        } else {
-            dossierVisitHistory.innerHTML = '<li>Нет данных о визитах</li>';
-        }
+        // ... (остальные поля как у вас) ...
         dossierDisplayPanel.style.display = 'block';
-        dossierShownForLabel = clientInfo.label;
-        if (detectionInterval) clearInterval(detectionInterval); // Пауза детекции, пока досье открыто
-        detectionInterval = null;
     }
 
     function hideDossier() {
-        if (dossierDisplayPanel.style.display === 'none') return;
         console.log("ВЫЗОВ: hideDossier()");
         dossierDisplayPanel.style.display = 'none';
-        dossierShownForLabel = null;
-        if (!detectionInterval && !unknownFaceState.formShown) { // Возобновляем, если не открыта форма регистрации
-             startDetection();
-        }
+        isDossierOpen = false;
     }
     closeDossierButton.addEventListener('click', hideDossier);
-    console.log("Функции досье и обработчик кнопки закрытия определены.");
 
     // --- Функции загрузки данных ---
-    async function loadClientData() {
-        console.log("Начинаю загрузку clients.json...");
-        try {
-            const response = await fetch('./clients.json');
-            if (!response.ok) throw new Error(`HTTP error! status: ${response.status} for clients.json`);
-            const clients = await response.json();
-            clients.forEach(client => { clientDataMap.set(client.label, client); labels.push(client.label); });
-            console.log("УСПЕХ: Данные клиентов загружены. Всего меток:", labels.length);
-            statusText.innerText = "Данные клиентов загружены.";
-        } catch (error) {
-            console.error("ОШИБКА загрузки clients.json:", error);
-            statusText.innerText = "Ошибка: Не удалось загрузить базу клиентов.";
-        }
-    }
+    async function loadClientData() { /* ... (как у вас) ... */ }
+    async function loadLabeledImagesAndMatcher(labelsToLoad) { /* ... (как у вас) ... */ }
 
-    async function loadLabeledImagesAndMatcher(labelsToLoad) {
-        if (!labelsToLoad || labelsToLoad.length === 0) { console.warn("Нет меток для загрузки. FaceMatcher не будет создан."); return null; }
-        console.log("ЗАГРУЗКА ЭТАЛОННЫХ ЛИЦ для:", labelsToLoad); statusText.innerText = "Загрузка эталонных лиц...";
-        const labeledFaceDescriptors = await Promise.all(
-            labelsToLoad.map(async (label) => {
-                const descriptors = []; console.log(`-- Загрузка для ${label} --`);
-                for (let i = 1; i <= 2; i++) { // Загружаем 2 фото для каждого
-                    let img = null;
-                    for (const ext of ['jpg', 'png', 'jpeg']) {
-                        const path = `./labeled_faces/${label}/${i}.${ext}`;
-                        try { img = await faceapi.fetchImage(path); console.log(`   УСПЕХ: ${path} загружен.`); break; } catch (e) { /* Игнорируем, если не найдено с этим расширением */ }
-                    }
-                    if (img) {
-                        try {
-                             console.log(`   Обнаружение лица на ${label}/${i}...`);
-                             const detection = await faceapi.detectSingleFace(img).withFaceLandmarks().withFaceDescriptor();
-                             if (detection) { descriptors.push(detection.descriptor); console.log(`      => Лицо найдено и дескриптор добавлен для ${label}/${i}.`); }
-                             else { console.warn(`      => Лицо НЕ найдено на ${label}/${i}.`); }
-                        } catch (detectError) { console.error(`      => ОШИБКА обнаружения на ${label}/${i}:`, detectError); }
-                    } else { console.error(`   ОШИБКА: Не удалось загрузить ${label}/${i}.(jpg/png/jpeg). Проверьте путь и наличие файла!`); }
-                }
-                if (descriptors.length > 0) { console.log(`   => УСПЕХ для ${label}: ${descriptors.length} дескриптор(а) создано.`); return new faceapi.LabeledFaceDescriptors(label, descriptors); }
-                else { console.error(`   => ОШИБКА для ${label}: Не удалось создать ни одного дескриптора.`); return null; }
-            })
-        );
-        const validDescriptors = labeledFaceDescriptors.filter(d => d !== null);
-        console.log(`ИТОГО: Загружено валидных дескрипторов: ${validDescriptors.length} из ${labelsToLoad.length}`);
-        if (validDescriptors.length === 0) { console.error("КРИТИЧЕСКАЯ ОШИБКА: НИ ОДНОГО дескриптора. FaceMatcher не будет создан."); statusText.innerText = "Ошибка: Не удалось загрузить эталонные лица."; return null; }
-        statusText.innerText = "Face Matcher готов."; console.log("Face Matcher УСПЕШНО создан.");
-        return new faceapi.FaceMatcher(validDescriptors, 0.6);
-    }
-
-    // --- Логика обработки и отслеживания ---
-    function resetUnknownFaceState() {
-        unknownFaceState.tracking = false; unknownFaceState.startTime = null;
-        unknownFaceState.descriptor = null; unknownFaceState.ageReadings = [];
-        unknownFaceState.genderReadings = []; unknownFaceState.stabilizedAge = null;
-        unknownFaceState.stabilizedGender = null;
-        // unknownFaceState.formShown = false; // Не сбрасываем formShown здесь, им управляют его функции
-        unknownFaceState.box = null; unknownFaceState.detectionData = null;
-    }
-
-    function processDetections(detections, displaySize, canvas) {
-        const ctx = canvas.getContext("2d"); ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-        if (detections.length === 0) {
-            resetUnknownFaceState(); hideDossier(); hideRegistrationForm();
-            statusText.innerText = "Ожидание лиц...";
-            return;
-        }
-
-        // Если одна из форм уже открыта, просто рисуем текущее лицо и выходим
-        if (unknownFaceState.formShown && unknownFaceState.detectionData) {
-            drawUnknownFace(unknownFaceState.detectionData, canvas, `Регистрация...`);
-            return;
-        }
-        if (dossierShownForLabel && detections.length > 0) {
-            const currentDossierFace = detections.find(d => faceMatcher && faceMatcher.findBestMatch(d.descriptor).label === dossierShownForLabel);
-            if (currentDossierFace) {
-                drawKnownFace(currentDossierFace, dossierShownForLabel, canvas);
-                return; // Если досье для текущего лица уже показывается, ничего больше не делаем
-            } else {
-                // Лицо, для которого было досье, пропало, но есть другие лица
-                hideDossier(); // Скрываем, так как его нет
-            }
-        }
-
-
-        let foundKnownFaceThisFrame = null;
-        let firstUnknownFaceData = null;
-
-        detections.forEach(d => {
-            const bestMatch = (faceMatcher) ? faceMatcher.findBestMatch(d.descriptor) : { label: 'unknown', distance: 1 };
-            console.log(`  Лицо: Возраст=${d.age?.toFixed(1)}, Пол=${d.gender}, Match=${bestMatch.label} (Дист: ${bestMatch.distance.toFixed(2)})`);
-
-            if (bestMatch.label !== 'unknown') {
-                if (!foundKnownFaceThisFrame) { // Берем первое известное лицо
-                    foundKnownFaceThisFrame = clientDataMap.get(bestMatch.label);
-                }
-                drawKnownFace(d, bestMatch.label, canvas);
-            } else {
-                if (!firstUnknownFaceData) { // Берем первое неизвестное
-                    firstUnknownFaceData = d;
-                }
-                drawUnknownFace(d, canvas, "Не опознан");
-            }
-        });
-
-        if (foundKnownFaceThisFrame) {
-            showDossier(foundKnownFaceThisFrame);
-            resetUnknownFaceState(); // Сбрасываем трекинг неизвестного, если видим известное
-            hideRegistrationForm(); // Закрываем форму регистрации
-        } else if (detections.length === 1 && firstUnknownFaceData) { // Только если ОДНО лицо и оно НЕИЗВЕСТНОЕ
-             hideDossier(); // Убедимся, что досье скрыто
-            if (firstUnknownFaceData.age === undefined || firstUnknownFaceData.gender === undefined) {
-                console.warn("Возраст/Пол не определены для неизвестного лица!");
-                drawUnknownFace(firstUnknownFaceData, canvas, "Ошибка данных");
-                resetUnknownFaceState();
-            } else {
-                handleUnknownFace(firstUnknownFaceData, displaySize, canvas);
-            }
-        } else { // Несколько неизвестных лиц или смесь без опознанных ИЛИ если было опознанное, но оно пропало
-            hideDossier();
-            hideRegistrationForm();
-            resetUnknownFaceState();
-            statusText.innerText = detections.length > 1 ? "Обнаружено несколько лиц" : "Анализ...";
-        }
-    }
-
-    function handleUnknownFace(d, displaySize, canvas) {
-        console.log("ВЫЗОВ: handleUnknownFace()");
+    // --- НОВАЯ Логика обработки ---
+    async function processMultipleDetections(detections, displaySize, canvas) {
         const now = Date.now();
-        unknownFaceState.detectionData = d; // Сохраняем для отрисовки, пока форма открыта
+        const seenLabelsThisFrame = new Set();
+        const ctx = canvas.getContext("2d");
 
-        if (!unknownFaceState.tracking) {
-             unknownFaceState.tracking = true;
-             unknownFaceState.startTime = now;
-             unknownFaceState.descriptor = d.descriptor; // Не используется активно, но можно для трекинга
-        }
+        for (const d of detections) {
+            if (!d.descriptor) continue; // Пропускаем, если нет дескриптора
 
-        const timeElapsed = now - unknownFaceState.startTime;
+            const bestMatch = faceMatcher ? faceMatcher.findBestMatch(d.descriptor) : { label: 'unknown' };
+            let currentLabel = bestMatch.label;
+            let isKnown = bestMatch.label !== 'unknown';
+            let client = null;
 
-        if (timeElapsed < ANALYSIS_TIME) {
-            unknownFaceState.ageReadings.push(d.age);
-            unknownFaceState.genderReadings.push(d.gender);
-            statusText.innerText = `Анализ нового лица... ${((ANALYSIS_TIME - timeElapsed) / 1000).toFixed(1)}с`;
-            drawUnknownFace(d, canvas, `Анализ... (~${Math.round(d.age)})`);
-        } else {
-            if (unknownFaceState.stabilizedAge === null) {
-                unknownFaceState.stabilizedAge = calculateMedian(unknownFaceState.ageReadings);
-                unknownFaceState.stabilizedGender = calculateMode(unknownFaceState.genderReadings);
+            // Ищем клиента
+            if (isKnown) {
+                client = activeClients.get(currentLabel);
+            } else {
+                for (const [label, c] of activeClients.entries()) {
+                    if (!c.isKnown) {
+                        const distance = faceapi.euclideanDistance(d.descriptor, c.descriptor);
+                        if (distance < 0.55) {
+                            client = c;
+                            currentLabel = label;
+                            break;
+                        }
+                    }
+                }
             }
 
-            if (timeElapsed >= (ANALYSIS_TIME + FORM_DELAY) && !unknownFaceState.formShown) {
-                statusText.innerText = "Обнаружен новый клиент! Открытие формы регистрации...";
-                showRegistrationForm(unknownFaceState.stabilizedAge, unknownFaceState.stabilizedGender);
-                // unknownFaceState.formShown = true; // Устанавливается внутри showRegistrationForm
-            } else if (!unknownFaceState.formShown) {
-                statusText.innerText = `Новое лицо. Возраст: ${unknownFaceState.stabilizedAge}. Регистрация через ${((ANALYSIS_TIME + FORM_DELAY - timeElapsed) / 1000).toFixed(1)}с`;
-                drawUnknownFace(d, canvas, `Новый клиент (~${unknownFaceState.stabilizedAge})`);
+            // Если не нашли - создаем нового
+            if (!client) {
+                if (!isKnown) {
+                    sessionCounter++;
+                    currentLabel = `unknown_${sessionCounter}`;
+                }
+                client = createClientState(currentLabel, d.descriptor, d, isKnown);
+                activeClients.set(currentLabel, client);
+                console.log(`[ПОЯВИЛСЯ]: ${currentLabel} (Известен: ${isKnown})`);
+            }
+
+            // Обновляем данные
+            client.lastSeen = now;
+            client.box = d.detection.box;
+            client.age = d.age ? Math.round(d.age) : client.age;
+            client.gender = d.gender || client.gender;
+            client.descriptor = d.descriptor;
+            if(d.expressions) client.emotionsHistory.push(d.expressions);
+            if(client.emotionsHistory.length > 50) client.emotionsHistory.shift();
+
+            seenLabelsThisFrame.add(currentLabel);
+
+            // Обновляем зоны
+            const zone = checkZone(client.box, interestZones);
+            if (zone) {
+                if (client.currentZone !== zone) {
+                    client.currentZone = zone;
+                    client.zoneEntryTime = now;
+                } else {
+                    const timeInZone = now - client.zoneEntryTime;
+                    client.viewedModels.set(interestZones[zone].name, (client.viewedModels.get(interestZones[zone].name) || 0) + 500);
+                    if (timeInZone >= ZONE_THRESHOLD && !client.viewedModels.has(`${interestZones[zone].name}_INTEREST`)) {
+                        console.log(`[ИНТЕРЕС]: ${currentLabel} к ${interestZones[zone].name}`);
+                        client.viewedModels.set(`${interestZones[zone].name}_INTEREST`, true);
+                    }
+                }
+            } else { client.currentZone = null; client.zoneEntryTime = null; }
+
+            // Рисуем
+            faceapi.draw.drawDetections(canvas, d);
+            drawClientInfo(ctx, client.box, client);
+
+            // Логика UI (только если ничего не открыто)
+            if (!isFormOpen && !isDossierOpen) {
+                if (client.isKnown) {
+                    showDossier(clientDataMap.get(client.id));
+                } else if (!client.registrationTriggered && (now - client.entryTime > REGISTRATION_DELAY)) {
+                    client.registrationTriggered = true;
+                    showRegistrationForm(client.age, client.gender, client.id);
+                }
             }
         }
-     }
 
-    // --- Функции отрисовки ---
-    function drawFaceInfo(ctx, box, textLines) {
-         new faceapi.draw.DrawTextField(
-             textLines,
-             box.topLeft,
-             {
-                 backgroundColor: 'rgba(22, 27, 34, 0.7)', // Темный фон (из Remix)
-                 fontColor: '#C9D1D9', // Светлый текст (из Remix)
-                 fontSize: 14,
-                 padding: 8
-             }
-         ).draw(ctx);
+        // Удаляем ушедших
+        for (const [label, client] of activeClients.entries()) {
+            if (!seenLabelsThisFrame.has(label)) {
+                if (now - client.lastSeen > INACTIVITY_TIMEOUT) {
+                    client.timeSpent = client.lastSeen - client.entryTime;
+                    console.log(`[УШЕЛ]: ${label}. Время: ${(client.timeSpent / 1000).toFixed(0)}с.`);
+                    sendClientDataToServer(client);
+                    activeClients.delete(label);
+                    if (isDossierOpen && dossierId.textContent === label) hideDossier();
+                    if (isFormOpen && formLinkedClientId === label) hideRegistrationForm();
+                }
+            }
+        }
+         statusText.innerText = `Активных клиентов: ${activeClients.size}. Форма: ${isFormOpen}. Досье: ${isDossierOpen}`;
     }
 
-    function drawKnownFace(d, label, canvas) {
-        console.log(`  => Рисую ИЗВЕСТНОЕ: ${label}`);
-        const ctx = canvas.getContext("2d");
-        const boxColor = '#58A6FF'; // Синий акцент (из Remix)
-        faceapi.draw.drawDetections(canvas, d, { boxColor: boxColor, lineWidth: 2 });
-        const clientInfo = clientDataMap.get(label);
-        const text = clientInfo ? clientInfo.name : label;
-        drawFaceInfo(ctx, d.detection.box, [text]);
-    }
-
-    function drawUnknownFace(d, canvas, mainText) {
-        console.log(`  => Рисую НЕИЗВЕСТНОЕ: ${mainText}`);
-        const ctx = canvas.getContext("2d");
-        const boxColor = '#8B949E'; // Серый для неизвестных (из Remix)
-        faceapi.draw.drawDetections(canvas, d, { boxColor: boxColor });
-        const age = unknownFaceState.stabilizedAge || (d.age ? Math.round(d.age) : '?');
-        const genderRaw = unknownFaceState.stabilizedGender || d.gender;
-        const gender = genderRaw === 'male' ? 'Мужской' : (genderRaw === 'female' ? 'Женщина' : '?');
-        drawFaceInfo(ctx, d.detection.box, [mainText, `${gender}, ~${age} лет`]);
-    }
 
     // --- Запуск и интервал ---
     async function startDetection() {
-         console.log("Вызвана функция startDetection.");
-         if (!canvas) { canvas = faceapi.createCanvasFromMedia(video); videoContainer.appendChild(canvas); }
-         statusText.innerText = "Запуск обнаружения...";
-         const displaySize = { width: video.width, height: video.height };
-         faceapi.matchDimensions(canvas, displaySize);
-         if (detectionInterval) { console.log("Очистка предыдущего интервала."); clearInterval(detectionInterval); detectionInterval = null; }
-         console.log("Canvas настроен. Запускаю setInterval...");
-         detectionInterval = setInterval(async () => {
-             try {
-                 const detections = await faceapi.detectAllFaces(video, new faceapi.SsdMobilenetv1Options()).withFaceLandmarks().withFaceDescriptors().withAgeAndGender();
-                 const resizedDetections = faceapi.resizeResults(detections, displaySize);
-                 if (!unknownFaceState.formShown && !dossierShownForLabel) { // Обрабатываем, только если никакая форма не открыта
-                    processDetections(resizedDetections, displaySize, canvas);
-                 } else if (unknownFaceState.formShown && resizedDetections.length > 0) {
-                     // Просто рисуем лицо, если форма открыта
-                     const ctx = canvas.getContext("2d"); ctx.clearRect(0, 0, canvas.width, canvas.height);
-                     drawUnknownFace(resizedDetections[0], canvas, "Регистрация...");
-                 } else if (dossierShownForLabel && resizedDetections.length > 0) {
-                     const ctx = canvas.getContext("2d"); ctx.clearRect(0, 0, canvas.width, canvas.height);
-                     const knownFaceInView = resizedDetections.find(det => faceMatcher && faceMatcher.findBestMatch(det.descriptor).label === dossierShownForLabel);
-                     if (knownFaceInView) {
-                        drawKnownFace(knownFaceInView, dossierShownForLabel, canvas);
-                     } else {
-                        // Если лицо, для которого было досье, пропало, но есть другие
-                        detections.forEach(det => drawUnknownFace(det, canvas, "Не опознан"));
-                     }
-                 }
+        console.log("Вызвана функция startDetection.");
+        if (!canvas) { canvas = faceapi.createCanvasFromMedia(video); videoContainer.appendChild(canvas); }
+        const displaySize = { width: video.width, height: video.height };
+        faceapi.matchDimensions(canvas, displaySize);
 
+        if (detectionInterval) clearInterval(detectionInterval);
 
-             } catch (error) { console.error("ОШИБКА в цикле обнаружения:", error); statusText.innerText = "Ошибка обнаружения!"; if(detectionInterval) clearInterval(detectionInterval); detectionInterval = null; }
-         }, 500);
+        detectionInterval = setInterval(async () => {
+            try {
+                const detections = await faceapi.detectAllFaces(video, new faceapi.SsdMobilenetv1Options())
+                    .withFaceLandmarks()
+                    .withFaceDescriptors()
+                    .withAgeAndGender()
+                    .withFaceExpressions(); // <-- Добавили эмоции
+
+                const resizedDetections = faceapi.resizeResults(detections, displaySize);
+                const ctx = canvas.getContext("2d");
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                drawZones(ctx, interestZones); // Рисуем зоны
+
+                await processMultipleDetections(resizedDetections, displaySize, canvas); // Вызываем новую функцию
+
+            } catch (error) {
+                console.error("ОШИБКА в цикле обнаружения:", error);
+                statusText.innerText = "Ошибка обнаружения!";
+                if (detectionInterval) clearInterval(detectionInterval);
+                detectionInterval = null;
+            }
+        }, 500); // 500ms интервал
     }
 
+    // --- Функция RUN ---
     const run = async () => {
         console.log("Вызвана функция run.");
-        statusText.innerText = "Загрузка моделей..."; console.log("Начинаю загрузку моделей...");
-        const models = [ 'ssdMobilenetv1', 'faceLandmark68Net', 'faceRecognitionNet', 'ageGenderNet', 'faceExpressionNet' ];
+        statusText.innerText = "Загрузка моделей...";
+        // УБЕДИТЕСЬ, ЧТО ВСЕ МОДЕЛИ ЕСТЬ В ПАПКЕ /models
+        const models = ['ssdMobilenetv1', 'faceLandmark68Net', 'faceRecognitionNet', 'ageGenderNet', 'faceExpressionNet'];
         for (const modelName of models) {
-            try { console.log(`Загрузка ${modelName}...`); await faceapi.nets[modelName].loadFromUri("./models"); console.log(`   УСПЕХ: ${modelName} загружена.`); }
-            catch (error) { console.error(`   !!! ОШИБКА загрузки ${modelName}:`, error); statusText.innerText = `Ошибка загрузки ${modelName}!`; return; }
+            try { await faceapi.nets[modelName].loadFromUri("./models"); console.log(`УСПЕХ: ${modelName} загружена.`); }
+            catch (error) { console.error(`!!! ОШИБКА загрузки ${modelName}:`, error); statusText.innerText = `Ошибка загрузки ${modelName}!`; return; }
         }
-        console.log("Все модели успешно загружены.");
 
         await loadClientData();
         faceMatcher = await loadLabeledImagesAndMatcher(labels);
 
-        if (!faceMatcher) { console.warn("FaceMatcher не создан. Распознавание будет ограничено."); statusText.innerText = "Внимание: Распознавание известных лиц не работает."; }
-
-        console.log("Запускаю видеопоток..."); statusText.innerText = "Запуск видеопотока...";
+        statusText.innerText = "Запуск видеопотока...";
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ video: {} });
             video.srcObject = stream;
-        } catch (err) { console.error("Ошибка доступа к камере:", err); statusText.innerText = "ОШИБКА: Нет доступа к камере!"; alert("Не удалось получить доступ к камере."); return; }
+        } catch (err) { console.error("Ошибка доступа к камере:", err); statusText.innerText = "ОШИБКА: Нет доступа к камере!"; return; }
 
         video.addEventListener("play", () => {
-            console.log("Событие 'play' сработало. Вызываю startDetection...");
-            statusText.innerText = "Видео запущено.";
+            console.log("Событие 'play'. Вызываю startDetection...");
             startDetection();
         });
-        console.log("Обработчик 'play' добавлен.");
     };
 
     console.log("Вызываю run()...");
     run();
 
-});
+}); // Конец DOMContentLoaded
