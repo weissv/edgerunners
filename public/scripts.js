@@ -670,21 +670,30 @@ window.addEventListener('DOMContentLoaded', () => {
 
     // --- ГЛАВНАЯ ЛОГИКА ОБРАБОТКИ КАДРА (из v6.0, с мелкими правками) ---
     async function processMultipleDetections(detections, displaySize, canvas) {
-        const now = Date.now(); const seenLabelsThisFrame = new Set(); const ctx = canvas.getContext("2d");
+        const now = Date.now();
+        const seenLabelsThisFrame = new Set();
+        const ctx = canvas.getContext("2d");
+
         for (const d of detections) {
             if (!d.descriptor || !d.detection || !d.detection.box) continue;
-            let client = null; let currentLabelForFace = null; let isKnownByMainMatcher = false; let isRecognizedAsUnregistered = false;
+
+            let client = null;
+            let currentLabelForFace = null;
+            let isKnownByMainMatcher = false;
+            let isRecognizedAsUnregistered = false;
             const currentDescriptor = d.descriptor;
+
             const bestMatch = faceMatcher ? faceMatcher.findBestMatch(currentDescriptor) : { label: 'unknown', distance: Infinity };
 
+            // 1. Проверка известных лиц
             if (bestMatch.label !== 'unknown') {
-                currentLabelForFace = bestMatch.label; isKnownByMainMatcher = true;
-                client = activeClients.get(currentLabelForFace);
-            } // ... (Код после проверки bestMatch.label !== 'unknown') ...
-            else {
-                // Пытаемся найти совпадение среди НЕЗАРЕГИСТРИРОВАННЫХ (unreg_X)
+                currentLabelForFace = bestMatch.label;
+                isKnownByMainMatcher = true;
+            } else {
+                // 2. Проверка незарегистрированных (unreg_X)
                 let bestUnregMatchId = null;
                 let minUnregDistance = SIMILARITY_THRESHOLD_FOR_UNREGISTERED_MATCH; // 0.52
+
                 for (const [unregId, unregData] of unregisteredFaces.entries()) {
                     for (const storedDesc of unregData.descriptors) {
                         const dist = faceapi.euclideanDistance(currentDescriptor, storedDesc);
@@ -694,35 +703,30 @@ window.addEventListener('DOMContentLoaded', () => {
                         }
                     }
                 }
+
                 if (bestUnregMatchId) {
                     currentLabelForFace = bestUnregMatchId;
                     isRecognizedAsUnregistered = true;
-                    client = activeClients.get(currentLabelForFace);
                     const unregData = unregisteredFaces.get(currentLabelForFace);
-                    // ... (остальной код обновления unregData) ...
                     if (unregData) {
                         unregData.lastSeen = now;
                         if (unregData.descriptors.length < MAX_DESCRIPTORS_PER_UNREGISTERED) {
-                            let isFarEnough = true;
-                            for (const desc of unregData.descriptors) { if (faceapi.euclideanDistance(currentDescriptor, desc) < MIN_DISTANCE_FOR_NEW_UNREG_DESCRIPTOR) { isFarEnough = false; break; } }
-                            if (isFarEnough) { unregData.descriptors.push(currentDescriptor); console.log(`[UNREG UPDATE]: Добавлен ${unregData.descriptors.length}-й дескриптор для ${currentLabelForFace}.`);}
+                            let isFarEnough = !unregData.descriptors.some(desc => faceapi.euclideanDistance(currentDescriptor, desc) < MIN_DISTANCE_FOR_NEW_UNREG_DESCRIPTOR);
+                            if (isFarEnough) {
+                                unregData.descriptors.push(currentDescriptor);
+                                console.log(`[UNREG UPDATE]: Добавлен ${unregData.descriptors.length}-й дескриптор для ${currentLabelForFace}.`);
+                            }
                         }
                     }
                 }
             }
 
-            // --- [НОВЫЙ БЛОК ДЛЯ RE-ID UNKNOWN] ---
-            // Если лицо все еще не опознано (ни как известное, ни как unreg),
-            // пытаемся найти его среди ТЕКУЩИХ АКТИВНЫХ unknown_X.
+            // 3. Проверка активных неизвестных (unknown_X)
             if (!currentLabelForFace) {
                 let bestActiveUnknownMatchId = null;
-                // Этот порог МОЖЕТ БЫТЬ ЧУТЬ ВЫШЕ (менее строгим), чем для unreg,
-                // т.к. мы сравниваем с последним видимым дескриптором.
-                // ПОДБЕРИТЕ ЭТО ЗНАЧЕНИЕ! Начнем с 0.56
-                let minActiveUnknownDist = 0.56;
+                let minActiveUnknownDist = 0.56; // Порог для re-id unknown (можно менять)
 
                 for (const [activeId, activeClient] of activeClients.entries()) {
-                    // Ищем только среди тех, кто еще 'unknown_' и у кого есть дескриптор
                     if (activeId.startsWith('unknown_') && activeClient.descriptor) {
                         const dist = faceapi.euclideanDistance(currentDescriptor, activeClient.descriptor);
                         if (dist < minActiveUnknownDist) {
@@ -731,93 +735,132 @@ window.addEventListener('DOMContentLoaded', () => {
                         }
                     }
                 }
-
-                // Если нашли совпадение среди активных unknown_X
                 if (bestActiveUnknownMatchId) {
                     currentLabelForFace = bestActiveUnknownMatchId;
-                    console.log(`[RE-ID UNKNOWN]: Лицо (${currentLabelForFace}) переопознано (Dist: ${minActiveUnknownDist.toFixed(3)})`);
-                    client = activeClients.get(currentLabelForFace);
-                    // Важно: isKnownByMainMatcher и isRecognizedAsUnregistered остаются false.
+                    // console.log(`[RE-ID UNKNOWN]: Лицо (${currentLabelForFace}) переопознано (Dist: ${minActiveUnknownDist.toFixed(3)})`);
                 }
             }
-            // --- [КОНЕЦ НОВОГО БЛОКА] ---
 
-            // Если лицо ВСЕ ЕЩЕ не опознано, ТОЛЬКО ТОГДА создаем новый unknown_X
+            // 4. Если все еще не опознан - создаем НОВЫЙ unknown_X
             if (!currentLabelForFace) {
                 sessionCounter++;
                 currentLabelForFace = `unknown_${sessionCounter}`;
             }
 
-            // Если клиента нет в activeClients (т.е. он совсем новый unknown_X)
+            // 5. Получаем или Создаем состояние клиента (ИСПРАВЛЕННЫЙ БЛОК)
             if (!activeClients.has(currentLabelForFace)) {
+                // Если такого ID нет - это новый клиент (known, unreg или unknown)
                 client = createClientState(currentLabelForFace, currentDescriptor, d, isKnownByMainMatcher);
-                // ... (остальной код создания нового клиента) ... else {
+                // Если он unreg - подгружаем данные
+                if(isRecognizedAsUnregistered) {
+                    const unregData = unregisteredFaces.get(currentLabelForFace);
+                    if (unregData) {
+                        client.age = unregData.ageEstimate || client.age;
+                        client.gender = unregData.genderEstimate || client.gender;
+                        // client.isAgeReliable = ... // Можно добавить логику надежности из unreg
+                    }
+                }
+                activeClients.set(currentLabelForFace, client); // !!! ВАЖНО: Добавляем нового клиента !!!
+                console.log(`[ПОЯВИЛСЯ]: ${currentLabelForFace} (Известен: ${isKnownByMainMatcher}, Как незарег: ${isRecognizedAsUnregistered})`);
+            } else {
+                // Если ID уже есть - просто получаем его
                 client = activeClients.get(currentLabelForFace);
             }
 
-            if (!client) continue; // На всякий случай
+            // 6. Проверка на случай ошибки (ВАЖНО)
+            if (!client) {
+                console.error("КРИТИЧЕСКАЯ ОШИБКА: Не удалось получить или создать клиента для", currentLabelForFace);
+                continue; // Пропускаем этот кадр, чтобы не сломать все
+            }
 
-            client.lastSeen = now; client.box = d.detection.box; client.descriptor = currentDescriptor;
+            // 7. Обновляем данные клиента
+            client.lastSeen = now;
+            client.box = d.detection.box;
+            client.descriptor = currentDescriptor; // Всегда обновляем дескриптор для Re-ID
 
+            // Накопление дескрипторов для unknown
             if (!isKnownByMainMatcher && !isRecognizedAsUnregistered && client.id.startsWith('unknown_') && client.tempQualityDescriptors) {
-                const box = d.detection.box; const faceArea = box.width * box.height;
-                if (faceArea > MIN_FACE_AREA_TO_SAVE_AS_UNREG ) { if (client.tempQualityDescriptors.length < MAX_TEMP_DESCRIPTORS_FOR_UNKNOWN) { client.tempQualityDescriptors.push(currentDescriptor); } }
+                 const box = d.detection.box; const faceArea = box.width * box.height;
+                 if (faceArea > MIN_FACE_AREA_TO_SAVE_AS_UNREG ) {
+                     if (client.tempQualityDescriptors.length < MAX_TEMP_DESCRIPTORS_FOR_UNKNOWN) {
+                         client.tempQualityDescriptors.push(currentDescriptor);
+                     }
+                 }
             }
 
+            // Обновление возраста
             if (d.age) {
-                const currentRawAge = Math.round(d.age); const box = d.detection.box; const faceArea = box.width * box.height;
-                if (faceArea > MIN_FACE_AREA_FOR_RELIABLE_AGE) { client.ageReadings.push(d.age); if (client.ageReadings.length > AGE_READINGS_BUFFER_SIZE) { client.ageReadings.shift(); } client.isAgeReliable = true; }
-                else { client.isAgeReliable = (client.ageReadings.length > 0); }
-                if (client.ageReadings.length > 0) { client.age = calculateMedian(client.ageReadings); } else if (client.age === '?') { client.age = currentRawAge; client.isAgeReliable = (faceArea > MIN_FACE_AREA_FOR_RELIABLE_AGE); }
+                const box = d.detection.box; const faceArea = box.width * box.height;
+                if (faceArea > MIN_FACE_AREA_FOR_RELIABLE_AGE) {
+                    client.ageReadings.push(d.age);
+                    if (client.ageReadings.length > AGE_READINGS_BUFFER_SIZE) { client.ageReadings.shift(); }
+                    client.isAgeReliable = true;
+                } else { client.isAgeReliable = (client.ageReadings.length > 0); }
+
+                if (client.ageReadings.length > 0) { client.age = calculateMedian(client.ageReadings); }
+                else if (client.age === '?') { client.age = Math.round(d.age); client.isAgeReliable = (faceArea > MIN_FACE_AREA_FOR_RELIABLE_AGE); }
             } else { client.isAgeReliable = false; }
+
+            // Обновление пола и эмоций
             client.gender = d.gender || client.gender;
-            if(d.expressions) {
+            if (d.expressions) {
                 client.emotionsHistory.push(d.expressions); if(client.emotionsHistory.length > 50) client.emotionsHistory.shift();
-                let currentDominant = 'neutral'; let maxProb = 0.4; const latestExpressions = d.expressions;
-                if(latestExpressions){ for (const [emo, prob] of Object.entries(latestExpressions)) { if (prob > maxProb) { maxProb = prob; currentDominant = emo; } } client.dominantEmotion = currentDominant; }
+                let currentDominant = 'neutral'; let maxProb = 0.4;
+                const latestExpressions = d.expressions;
+                if (latestExpressions) {
+                    for (const [emo, prob] of Object.entries(latestExpressions)) {
+                        if (prob > maxProb) { maxProb = prob; currentDominant = emo; }
+                    }
+                    client.dominantEmotion = currentDominant;
+                }
             }
 
-            seenLabelsThisFrame.add(currentLabelForFace);
+            seenLabelsThisFrame.add(currentLabelForFace); // Отмечаем, что видели в этом кадре
 
+            // Проверка зон
             const zoneKey = checkZone(client.box, interestZones);
             if (zoneKey && interestZones[zoneKey]) {
                 const zoneName = interestZones[zoneKey].name;
                 if (client.currentZone !== zoneKey) { client.currentZone = zoneKey; client.zoneEntryTime = now; }
-                else { const timeInZone = now - client.zoneEntryTime; client.viewedModels.set(zoneName, (client.viewedModels.get(zoneName) || 0) + 700); if (timeInZone >= ZONE_THRESHOLD && zoneKey !== 'Negotiation_Table' && !client.viewedModels.has(`${zoneName}_INTEREST`)) { console.log(`[ИНТЕРЕС]: ${currentLabelForFace} к ${zoneName}`); client.viewedModels.set(`${zoneName}_INTEREST`, true); } }
+                else {
+                    const timeInZone = now - client.zoneEntryTime;
+                    client.viewedModels.set(zoneName, (client.viewedModels.get(zoneName) || 0) + 700); // 700 = интервал
+                    if (timeInZone >= ZONE_THRESHOLD && zoneKey !== 'Negotiation_Table' && !client.viewedModels.has(`${zoneName}_INTEREST`)) {
+                        console.log(`[ИНТЕРЕС]: ${currentLabelForFace} к ${zoneName}`);
+                        client.viewedModels.set(`${zoneName}_INTEREST`, true);
+                    }
+                }
             } else { client.currentZone = null; client.zoneEntryTime = null; }
 
-            faceapi.draw.drawDetections(canvas, d); // Отрисовка рамки
-            drawClientInfo(ctx, client.box, client); // Отрисовка инфо
+            // Отрисовка
+            faceapi.draw.drawDetections(canvas, d);
+            drawClientInfo(ctx, client.box, client);
 
-            // Логика показа форм/досье
+            // Показ форм/досье
             if (!isFormOpen && !isDossierOpen) {
                 if (client.isKnown && clientDataMap.has(client.id)) {
                     showDossier(clientDataMap.get(client.id));
-                }
-                else if (!client.isKnown && !client.registrationTriggered && (now - client.entryTime > REGISTRATION_DELAY)) {
-                    // [ИНТЕГРАЦИЯ] Убедимся, что возраст и пол есть, перед показом
+                } else if (!client.isKnown && !client.registrationTriggered && (now - client.entryTime > REGISTRATION_DELAY)) {
                     if (client.age !== '?' && client.gender !== '?') {
-                       client.registrationTriggered = true;
-                       showRegistrationForm(client.age, client.gender, client.id);
+                        client.registrationTriggered = true;
+                        showRegistrationForm(client.age, client.gender, client.id);
                     }
                 }
             }
         } // Конец цикла for (const d of detections)
 
-        // Обработка ушедших и сохранение незарегистрированных
+        // Обработка ушедших и сохранение незарегистрированных (остается без изменений)
         for (const [label, client] of activeClients.entries()) {
             if (!seenLabelsThisFrame.has(label)) {
                 if (now - client.lastSeen > INACTIVITY_TIMEOUT) {
                     client.timeSpent = client.lastSeen - client.entryTime;
                     console.log(`[УШЕЛ]: ${label}. Время: ${(client.timeSpent / 1000).toFixed(0)}с.`);
-                    await sendClientDataToServer(client); // Отправляем данные
+                    await sendClientDataToServer(client);
                     activeClients.delete(label);
-                    // [ИНТЕГРАЦИЯ] Закрываем досье/форму, если ушел нужный клиент
                     if (isDossierOpen && dossierDisplayPanel.style.display === 'block' && (formLinkedClientId === label || (client.isKnown && clientDataMap.get(label) && dossierName.textContent === clientDataMap.get(label).name))) { hideDossier(); }
                     if (isFormOpen && registrationForm.style.display === 'block' && formLinkedClientId === label) { hideRegistrationForm(); }
                 }
             } else {
-                 // Логика сохранения как unreg (остается как в v6.0)
                  if (!client.isKnown && client.id.startsWith('unknown_') && !unregisteredFaces.has(client.id) && client.tempQualityDescriptors && client.tempQualityDescriptors.length >= MIN_QUALITY_DESCRIPTORS_TO_SAVE_UNREG) {
                     const timeVisible = now - client.entryTime;
                     if (timeVisible > MIN_TIME_TO_SAVE_UNKNOWN_AS_UNREG) {
@@ -832,7 +875,6 @@ window.addEventListener('DOMContentLoaded', () => {
                                 oldClientData.tempQualityDescriptors = [];
                                 activeClients.delete(label);
                                 activeClients.set(newUnregId, oldClientData);
-                                // Если форма была открыта для этого unknown, обновляем ID
                                 if (formLinkedClientId === label) {
                                     formLinkedClientId = newUnregId;
                                     if(clientIdInput) clientIdInput.value = newUnregId;
