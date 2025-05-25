@@ -68,12 +68,13 @@ window.addEventListener('DOMContentLoaded', () => {
     let isDossierOpen = false;
     let formLinkedClientId = null; // ID клиента, для которого открыта форма
 
-    // !!! ВАЖНО: УКАЖИТЕ ПРАВИЛЬНЫЕ КООРДИНАТЫ И budgetCategory ДЛЯ ВАШИХ ЗОН !!!
+
     const interestZones = {
         'Model_S': { x1: 50, y1: 100, x2: 250, y2: 400, name: 'Седан "Элегант"', budgetCategory: 'premium' },
         'Model_X': { x1: 450, y1: 100, x2: 670, y2: 400, name: 'Внедорожник "Простор"', budgetCategory: 'mid-range' },
         'Model_3': { x1: 260, y1: 300, x2: 440, y2: 500, name: 'Спорткар "Скорость"', budgetCategory: 'budget' },
-        'Negotiation_Table': { x1: 300, y1: 10, x2: 420, y2: 80, name: 'Стол переговоров', budgetCategory: null } // Бюджет не применим
+        'Negotiation_Table': { x1: 300, y1: 10, x2: 420, y2: 80, name: 'Стол переговоров', budgetCategory: null },
+        'Manager_Desk': { x1: 600, y1: 10, x2: 710, y2: 80, name: 'Стойка менеджера', budgetCategory: null } // <<< ДОБАВЛЕНО (Координаты ваши!)
     };
     const REGISTRATION_DELAY = 5000; // Задержка перед показом формы
 
@@ -297,55 +298,94 @@ window.addEventListener('DOMContentLoaded', () => {
 
     // --- Функция анализа (основная) (из v6.0) ---
     function generateVisitSummary(client) {
-        if (!client) return { details: "Нет данных о клиенте.", goal: "Не определена", recommendations: [] };
+        if (!client) return { details: "Нет данных о клиенте.", goal: "Не определена", recommendations: [], testDriveInterest: 'Нет' };
+
         const age = client.age;
         const gender = client.gender === 'male' ? 'М' : (client.gender === 'female' ? 'Ж' : '?');
         const timeSpent = (client.timeSpent / 1000);
         const interactions = client.viewedModels;
-        const clientDominantEmotion = client.dominantEmotion;
         const negotiationZoneKey = 'Negotiation_Table';
-        const negotiationZoneName = interestZones[negotiationZoneKey] ? interestZones[negotiationZoneKey].name : 'Стол переговоров';
+        const negotiationZoneName = interestZones[negotiationZoneKey]?.name || 'Стол переговоров';
+        const managerZoneKey = 'Manager_Desk';
+        const managerZoneName = interestZones[managerZoneKey]?.name || 'Стойка менеджера';
+
         const negotiationTimeSec = (interactions.get(negotiationZoneName) || 0) / 1000;
+        const managerTimeSec = (interactions.get(managerZoneName) || 0) / 1000;
+
         const significantCarsViewed = new Map();
-        interactions.forEach((time, modelNameWithFlagOrZoneName) => {
-            let modelName = modelNameWithFlagOrZoneName;
-            if (modelNameWithFlagOrZoneName.endsWith('_INTEREST')) { modelName = modelNameWithFlagOrZoneName.replace('_INTEREST', '');}
+        let mostViewedCar = null;
+        let maxCarTime = 0;
+
+        interactions.forEach((timeMs, modelNameKey) => {
+            let modelName = modelNameKey.replace('_INTEREST', '');
             let isCarZoneName = false;
-            for(const key in interestZones){ if(interestZones[key].name === modelName && key !== negotiationZoneKey){ isCarZoneName = true; break; } }
+            for (const key in interestZones) {
+                if (interestZones[key].name === modelName && key !== negotiationZoneKey && key !== managerZoneKey) {
+                    isCarZoneName = true; break;
+                }
+            }
             if (isCarZoneName) {
-                const totalTimeForModelMs = interactions.get(modelName) || 0;
-                if (totalTimeForModelMs / 1000 > 15) { significantCarsViewed.set(modelName, totalTimeForModelMs / 1000); }
+                const timeSec = timeMs / 1000;
+                if (timeSec > 15) { // Порог интереса к авто = 15 сек
+                    significantCarsViewed.set(modelName, timeSec);
+                    if (timeSec > maxCarTime) { maxCarTime = timeSec; mostViewedCar = modelName; }
+                }
             }
         });
+
         let inferredGoal = "Не определена";
+        let testDriveInterest = "Нет";
         let nameToDisplay = client.id;
         if (client.isKnown) { nameToDisplay = clientDataMap.get(client.id)?.name || client.id; }
         else if (client.id.startsWith('unreg_')) { nameToDisplay = `Клиент ${client.id.split('_')[1]} (не зарег.)`; }
         else if (client.id.startsWith('unknown_')) { nameToDisplay = `Клиент ${client.id.split('_')[1]}`; }
         let details = `Клиент '${nameToDisplay}' (${gender}, ~${age}${client.age !== '?' && !client.isAgeReliable ? " (оценка)" : ""}) провел(а) ${timeSpent.toFixed(0)}с. `;
-        let recommendations = [];
-        if (negotiationTimeSec > 30) {
-            if (significantCarsViewed.size > 0) {
-                inferredGoal = "Обсуждение покупки / Консультация"; details += `Высокий интерес к: ${[...significantCarsViewed.keys()].join(', ')}. `;
-                details += `Провел(а) у стола: ${negotiationTimeSec.toFixed(0)}с. (Возможно, обсуждался кредит).`;
-            } else {
-                inferredGoal = "Сервис / Финансы / Другой вопрос";
-                details += `Не проявил(а) интереса к авто, но был(а) у стола ${negotiationTimeSec.toFixed(0)}с. (Возможно, кредит или сервис).`;
-            }
+        let recommendations = []; // Пока оставим пустым
+
+        if (managerTimeSec > 25 && significantCarsViewed.size > 0) {
+            inferredGoal = "Обсуждение у менеджера (Тест-Драйв?)";
+            testDriveInterest = "Высокий";
+            details += `Обсуждал(а) у менеджера (${managerTimeSec.toFixed(0)}с) после интереса к ${[...significantCarsViewed.keys()].join(', ')}.`;
+            recommendations.push({ modelName: mostViewedCar, reason: "Наибольший интерес + визит к менеджеру." });
+        } else if (negotiationTimeSec > 30 && significantCarsViewed.size > 0) {
+            inferredGoal = "Обсуждение покупки / Консультация";
+            testDriveInterest = "Средний";
+            details += `Высокий интерес к: ${[...significantCarsViewed.keys()].join(', ')}. Провел(а) у стола: ${negotiationTimeSec.toFixed(0)}с.`;
         } else if (significantCarsViewed.size > 0) {
-            inferredGoal = "Активное изучение моделей"; details += `Высокий интерес к: ${[...significantCarsViewed.keys()].join(', ')}. Не подходил(а) к столу.`;
+            inferredGoal = "Активное изучение моделей";
+            testDriveInterest = "Низкий";
+            details += `Высокий интерес к: ${[...significantCarsViewed.keys()].join(', ')}. Не подходил(а) к столам.`;
+        } else if (managerTimeSec > 25) {
+             inferredGoal = "Общий вопрос у менеджера";
+             testDriveInterest = "Нет";
+             details += `Был(а) у менеджера (${managerTimeSec.toFixed(0)}с), но без интереса к авто.`;
+        } else if (negotiationTimeSec > 30) {
+            inferredGoal = "Сервис / Финансы / Другой вопрос";
+            testDriveInterest = "Нет";
+            details += `Был(а) у стола ${negotiationTimeSec.toFixed(0)}с, но без интереса к авто.`;
         } else {
-            let hasAnyCarInteraction = false;
-            interactions.forEach((time, modelName) => {
-                let isCarZoneName = false;
-                for(const key in interestZones){ if(interestZones[key].name === modelName && key !== negotiationZoneKey){ isCarZoneName = true; break; } }
-                if (isCarZoneName && !modelName.endsWith('_INTEREST')) hasAnyCarInteraction = true;
-            });
-            if (hasAnyCarInteraction) { inferredGoal = "Первичный осмотр / Сравнение"; details += `Кратко осмотрел(а) некоторые модели.`; }
-            else { inferredGoal = "Ожидание / Случайный визит"; details += `Не проявил(а) интереса к зонам.`; }
+             let hasAnyCarInteraction = false;
+             interactions.forEach((time, modelName) => {
+                 let isCarZoneName = false;
+                 for(const key in interestZones){ if(interestZones[key].name === modelName && key !== negotiationZoneKey && key !== managerZoneKey){ isCarZoneName = true; break; } }
+                 if (isCarZoneName && !modelName.endsWith('_INTEREST')) hasAnyCarInteraction = true;
+             });
+             if (hasAnyCarInteraction) { inferredGoal = "Первичный осмотр / Сравнение"; details += `Кратко осмотрел(а) некоторые модели.`; }
+             else { inferredGoal = "Ожидание / Случайный визит"; details += `Не проявил(а) интереса к зонам.`; }
         }
-        // (Логика рекомендаций остается)
-        return { details: details, goal: inferredGoal, recommendations: recommendations };
+
+        // Добавляем рекомендации в details
+        if (recommendations.length > 0) {
+            details += " Рекомендации: ";
+            recommendations.forEach((rec, index) => { details += `${index + 1}) ${rec.modelName} (${rec.reason}) `; });
+        }
+
+        return {
+            details: details,
+            goal: inferredGoal,
+            recommendations: recommendations,
+            testDriveInterest: testDriveInterest // <<< ВОЗВРАЩАЕМ ИНТЕРЕС
+        };
     }
 
     // --- Функция отправки данных (из v6.0) ---
@@ -353,17 +393,25 @@ window.addEventListener('DOMContentLoaded', () => {
         if (!client) return;
         const viewed = {}; const significantInterest = {};
         const negotiationZoneKey = 'Negotiation_Table';
-        const negotiationZoneName = interestZones[negotiationZoneKey] ? interestZones[negotiationZoneKey].name : 'Стол переговоров';
+        const negotiationZoneName = interestZones[negotiationZoneKey]?.name || 'Стол переговоров';
+        const managerZoneKey = 'Manager_Desk';
+        const managerZoneName = interestZones[managerZoneKey]?.name || 'Стойка менеджера';
+
         const negotiationTime = (client.viewedModels.get(negotiationZoneName) || 0) / 1000;
+        const managerTime = (client.viewedModels.get(managerZoneName) || 0) / 1000;
+
         client.viewedModels.forEach((time, model) => {
             if (!model.endsWith('_INTEREST')) {
                 const timeSeconds = time / 1000;
                 viewed[model] = timeSeconds.toFixed(1) + 'c';
-                if (timeSeconds > 15 && model !== negotiationZoneName) { significantInterest[model] = timeSeconds.toFixed(1) + 'c'; }
+                if (timeSeconds > 15 && model !== negotiationZoneName && model !== managerZoneName) {
+                    significantInterest[model] = timeSeconds.toFixed(1) + 'c';
+                }
             }
         });
 
-        const { details, goal, recommendations } = generateVisitSummary(client);
+        // Получаем полный анализ, включая тест-драйв
+        const { details, goal, recommendations, testDriveInterest } = generateVisitSummary(client);
         const purchaseAnalysis = analyzePurchaseLikelihood(client, activeClients);
 
         const dataToSend = {
@@ -371,12 +419,14 @@ window.addEventListener('DOMContentLoaded', () => {
             entryTime: new Date(client.entryTime).toLocaleString('ru-RU'), exitTime: new Date().toLocaleString('ru-RU'),
             timeSpentSeconds: (client.timeSpent / 1000).toFixed(0), allViewedModels: viewed,
             significantInterest: significantInterest, negotiationTimeSeconds: negotiationTime.toFixed(0),
+            managerTimeSeconds: managerTime.toFixed(0), // <<< ДОБАВИЛИ ВРЕМЯ У МЕНЕДЖЕРА
             inferredGoal: goal, summaryDetails: details, recommendations: recommendations,
             purchaseLikelihood: purchaseAnalysis.likelihood,
             preferredBudgetCategory: purchaseAnalysis.preferredBudget,
-            likelihoodReason: purchaseAnalysis.reason
+            likelihoodReason: purchaseAnalysis.reason,
+            testDriveInterest: testDriveInterest // <<< ДОБАВИЛИ ИНТЕРЕС К ТЕСТ-ДРАЙВУ
         };
-        console.log("ОТПРАВКА ДАННЫХ (с анализом покупки):", dataToSend);
+        console.log("ОТПРАВКА ДАННЫХ:", dataToSend);
 
         let nameForDisplay = client.id;
         if (client.isKnown) { nameForDisplay = clientDataMap.get(client.id)?.name || client.id; }
@@ -387,6 +437,7 @@ window.addEventListener('DOMContentLoaded', () => {
             name: nameForDisplay, details: details, goal: goal,
             purchaseLikelihood: purchaseAnalysis.likelihood,
             likelihoodReason: purchaseAnalysis.reason,
+            testDriveInterest: testDriveInterest, // <<< ДОБАВИЛИ В СВОДКУ
             timestamp: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
         };
         recentVisitSummaries.unshift(summaryForDisplay);
@@ -397,7 +448,6 @@ window.addEventListener('DOMContentLoaded', () => {
             if (response.ok) { console.log("УСПЕХ: Данные отправлены на сервер!"); } else { console.error("ОШИБКА ОТПРАВКИ:", response.status, await response.text()); }
         } catch (error) { console.error("СЕТЕВАЯ ОШИБКА:", error); }
     }
-
     // --- Функция для панели (из v6.0) ---
     function updateDashboard() {
         if (!dashboardContent) return;
@@ -413,11 +463,19 @@ window.addEventListener('DOMContentLoaded', () => {
                 const genderMap = { 'male': 'М', 'female': 'Ж', '?': '?' };
                 let ageDisplay = (client.age !== '?') ? `~${client.age}` : '?';
                 if (client.age !== '?' && !client.isAgeReliable) { ageDisplay += " (оценка)"; }
+
+                // Определяем текущую зону, включая менеджера
+                let currentZoneName = '-';
+                if (client.currentZone && interestZones[client.currentZone]) {
+                     currentZoneName = interestZones[client.currentZone].name;
+                }
+
                 html += `<div class="client-card"><h3>${nameToDisplay}</h3>`;
                 html += `<p>Статус: <span>${client.isKnown ? 'Известен' : (client.id.startsWith('unreg_') ? 'Виден ранее' : 'Новый')}</span></p>`;
                 html += `<p>Пол/Возраст: <span>${genderMap[client.gender]} / ${ageDisplay}</span></p>`;
                 html += `<p>Эмоция: <span>${client.dominantEmotion}</span></p><p>Время: <span>${timeInSeconds} сек</span></p>`;
-                html += `<p>Смотрит: <span>${client.currentZone && interestZones[client.currentZone] ? interestZones[client.currentZone].name : '-'}</span></p>`;
+                html += `<p>Смотрит: <span style="font-weight: bold; color: ${currentZoneName === 'Стойка менеджера' ? 'var(--accent-green)' : 'white'};">${currentZoneName}</span></p>`; // Выделяем стойку менеджера
+
                 const viewedModels = [...client.viewedModels.keys()].filter(k => !k.endsWith('_INTEREST'));
                 if (viewedModels.length > 0) {
                     html += `<p>Интерес к:</p><ul>`;
@@ -431,13 +489,19 @@ window.addEventListener('DOMContentLoaded', () => {
             if (recentVisitSummaries.length > 0) {
                 recentVisitsTitle.style.display = 'block'; let summaryHtml = '';
                 recentVisitSummaries.forEach(visit => {
+                    // Определяем цвет для интереса к тест-драйву
+                    let testDriveColor = 'white';
+                    if (visit.testDriveInterest === 'Высокий') testDriveColor = 'var(--accent-green)';
+                    else if (visit.testDriveInterest === 'Средний') testDriveColor = 'var(--accent-yellow)';
+
                     summaryHtml +=
                     `<div class="visit-summary-card">
                         <p class="client-name">${visit.name} <span class="timestamp">(${visit.timestamp})</span></p>
                         <p>${visit.details}</p>
                         <p class="goal">Цель: ${visit.goal}</p>
                         <p class="goal" style="color: var(--accent-purple);">Вероятность покупки: ${visit.purchaseLikelihood || 'N/A'}</p>
-                        </div>`;
+                        <p class="goal" style="color: ${testDriveColor}; font-weight: bold;">Интерес к Тест-Драйву: ${visit.testDriveInterest || 'N/A'}</p> 
+                        </div>`; // <<< ДОБАВИЛИ СТРОКУ И ЦВЕТ
                 });
                 recentVisitsContent.innerHTML = summaryHtml;
             } else { recentVisitsTitle.style.display = 'none'; recentVisitsContent.innerHTML = ''; }
@@ -692,7 +756,7 @@ window.addEventListener('DOMContentLoaded', () => {
             } else {
                 // 2. Проверка незарегистрированных (unreg_X)
                 let bestUnregMatchId = null;
-                let minUnregDistance = SIMILARITY_THRESHOLD_FOR_UNREGISTERED_MATCH;
+                let minUnregDistance = SIMILARITY_THRESHOLD_FOR_UNREGISTERED_MATCH; // 0.52 (можно поднять до 0.53 - 0.54)
 
                 for (const [unregId, unregData] of unregisteredFaces.entries()) {
                     for (const storedDesc of unregData.descriptors) {
@@ -723,11 +787,12 @@ window.addEventListener('DOMContentLoaded', () => {
             // 3. Проверка активных неизвестных (unknown_X)
             if (!currentLabelForFace) {
                 let bestActiveUnknownMatchId = null;
-                let minActiveUnknownDist = 0.56; // Порог (можно менять)
+                let minActiveUnknownDist = 0.57; // <<< УВЕЛИЧИЛИ ПОРОГ (ЭКСПЕРИМЕНТИРУЙТЕ: 0.57 - 0.59)
 
                 for (const [activeId, activeClient] of activeClients.entries()) {
                     if (activeId.startsWith('unknown_') && activeClient.descriptor) {
                         const dist = faceapi.euclideanDistance(currentDescriptor, activeClient.descriptor);
+                        // console.log(`      -> Сравнение с ${activeId}, Дистанция: ${dist.toFixed(3)}`); // <<< РАСКОММЕНТИРУЙТЕ ДЛЯ ОТЛАДКИ
                         if (dist < minActiveUnknownDist) {
                             minActiveUnknownDist = dist; bestActiveUnknownMatchId = activeId;
                         }
@@ -735,6 +800,7 @@ window.addEventListener('DOMContentLoaded', () => {
                 }
                 if (bestActiveUnknownMatchId) {
                     currentLabelForFace = bestActiveUnknownMatchId;
+                    console.log(`[RE-ID UNKNOWN]: Лицо (${currentLabelForFace}) переопознано (Dist: ${minActiveUnknownDist.toFixed(3)})`);
                 }
             }
 
@@ -744,23 +810,20 @@ window.addEventListener('DOMContentLoaded', () => {
                 currentLabelForFace = `unknown_${sessionCounter}`;
             }
 
-            // 5. Получаем или Создаем состояние клиента (ИСПРАВЛЕННЫЙ БЛОК)
+            // 5. Получаем или Создаем состояние клиента
             if (!activeClients.has(currentLabelForFace)) {
                 client = createClientState(currentLabelForFace, currentDescriptor, d, isKnownByMainMatcher);
                 if(isRecognizedAsUnregistered) {
                     const unregData = unregisteredFaces.get(currentLabelForFace);
-                    if (unregData) {
-                        client.age = unregData.ageEstimate || client.age;
-                        client.gender = unregData.genderEstimate || client.gender;
-                    }
+                    if (unregData) { client.age = unregData.ageEstimate || client.age; client.gender = unregData.genderEstimate || client.gender; }
                 }
-                activeClients.set(currentLabelForFace, client); // !!! ДОБАВЛЯЕМ !!!
+                activeClients.set(currentLabelForFace, client);
                 console.log(`[ПОЯВИЛСЯ]: ${currentLabelForFace} (Известен: ${isKnownByMainMatcher}, Как незарег: ${isRecognizedAsUnregistered})`);
             } else {
-                client = activeClients.get(currentLabelForFace); // !!! ПОЛУЧАЕМ !!!
+                client = activeClients.get(currentLabelForFace);
             }
 
-            // 6. Проверка на случай ошибки (ВАЖНО)
+            // 6. Проверка на случай ошибки
             if (!client) {
                 console.error("КРИТИЧЕСКАЯ ОШИБКА: Не удалось получить или создать клиента для", currentLabelForFace);
                 continue;
@@ -771,6 +834,7 @@ window.addEventListener('DOMContentLoaded', () => {
             client.box = d.detection.box;
             client.descriptor = currentDescriptor;
 
+            // Накопление дескрипторов для unknown
             if (!isKnownByMainMatcher && !isRecognizedAsUnregistered && client.id.startsWith('unknown_') && client.tempQualityDescriptors) {
                  const box = d.detection.box; const faceArea = box.width * box.height;
                  if (faceArea > MIN_FACE_AREA_TO_SAVE_AS_UNREG && client.tempQualityDescriptors.length < MAX_TEMP_DESCRIPTORS_FOR_UNKNOWN) {
@@ -778,6 +842,7 @@ window.addEventListener('DOMContentLoaded', () => {
                  }
             }
 
+            // Обновление возраста
             if (d.age) {
                 const box = d.detection.box; const faceArea = box.width * box.height;
                 if (faceArea > MIN_FACE_AREA_FOR_RELIABLE_AGE) {
@@ -789,8 +854,10 @@ window.addEventListener('DOMContentLoaded', () => {
                 else if (client.age === '?') { client.age = Math.round(d.age); client.isAgeReliable = (faceArea > MIN_FACE_AREA_FOR_RELIABLE_AGE); }
             } else { client.isAgeReliable = false; }
 
+            // Обновление пола и эмоций
             client.gender = d.gender || client.gender;
             if (d.expressions) {
+                client.emotionsHistory.push(d.expressions); if(client.emotionsHistory.length > 50) client.emotionsHistory.shift();
                 let currentDominant = 'neutral'; let maxProb = 0.4;
                 const latestExpressions = d.expressions;
                 if (latestExpressions) {
@@ -801,17 +868,36 @@ window.addEventListener('DOMContentLoaded', () => {
 
             seenLabelsThisFrame.add(currentLabelForFace);
 
+            // Проверка зон
             const zoneKey = checkZone(client.box, interestZones);
-            if (zoneKey && interestZones[zoneKey]) { /* ... логика зон ... */ }
-            else { client.currentZone = null; client.zoneEntryTime = null; }
+            if (zoneKey && interestZones[zoneKey]) {
+                const zoneName = interestZones[zoneKey].name;
+                if (client.currentZone !== zoneKey) { client.currentZone = zoneKey; client.zoneEntryTime = now; }
+                else {
+                    const timeInZone = now - client.zoneEntryTime;
+                    client.viewedModels.set(zoneName, (client.viewedModels.get(zoneName) || 0) + 700); // 700 = интервал
+                    if (timeInZone >= ZONE_THRESHOLD && zoneKey !== 'Negotiation_Table' && zoneKey !== 'Manager_Desk' && !client.viewedModels.has(`${zoneName}_INTEREST`)) { // Исключаем столы
+                        console.log(`[ИНТЕРЕС]: ${currentLabelForFace} к ${zoneName}`);
+                        client.viewedModels.set(`${zoneName}_INTEREST`, true);
+                    }
+                }
+            } else { client.currentZone = null; client.zoneEntryTime = null; }
 
             // Отрисовка
             faceapi.draw.drawDetections(canvas, d);
             drawClientInfo(ctx, client.box, client);
 
             // Показ форм/досье
-            if (!isFormOpen && !isDossierOpen) { /* ... логика форм ... */ }
-
+            if (!isFormOpen && !isDossierOpen) {
+                 if (client.isKnown && clientDataMap.has(client.id)) {
+                    showDossier(clientDataMap.get(client.id));
+                } else if (!client.isKnown && !client.registrationTriggered && (now - client.entryTime > REGISTRATION_DELAY)) {
+                    if (client.age !== '?' && client.gender !== '?') {
+                        client.registrationTriggered = true;
+                        showRegistrationForm(client.age, client.gender, client.id);
+                    }
+                }
+            }
         } // Конец цикла for (const d of detections)
 
         // Обработка ушедших и сохранение незарегистрированных
@@ -819,10 +905,11 @@ window.addEventListener('DOMContentLoaded', () => {
             if (!seenLabelsThisFrame.has(label)) {
                 if (now - client.lastSeen > INACTIVITY_TIMEOUT) {
                     client.timeSpent = client.lastSeen - client.entryTime;
-                    console.log(`[УШЕЛ]: ${label}.`);
-                    await sendClientDataToServer(client);
+                    console.log(`[УШЕЛ]: ${label}. Время: ${(client.timeSpent / 1000).toFixed(0)}с.`);
+                    await sendClientDataToServer(client); // Отправляем данные
                     activeClients.delete(label);
-                    // ... закрытие форм/досье ...
+                    if (isDossierOpen && dossierDisplayPanel.style.display === 'block' && (formLinkedClientId === label || (client.isKnown && clientDataMap.get(label) && dossierName.textContent === clientDataMap.get(label).name))) { hideDossier(); }
+                    if (isFormOpen && registrationForm.style.display === 'block' && formLinkedClientId === label) { hideRegistrationForm(); }
                 }
             } else {
                  if (!client.isKnown && client.id.startsWith('unknown_') && !unregisteredFaces.has(client.id) && client.tempQualityDescriptors && client.tempQualityDescriptors.length >= MIN_QUALITY_DESCRIPTORS_TO_SAVE_UNREG && (now - client.entryTime > MIN_TIME_TO_SAVE_UNKNOWN_AS_UNREG) ) {
@@ -843,8 +930,6 @@ window.addEventListener('DOMContentLoaded', () => {
         }
         if(statusText) statusText.innerText = `Активных: ${activeClients.size} (Незарег: ${unregisteredFaces.size}) Форма: ${isFormOpen} Досье: ${isDossierOpen}`;
     }
-    // --- ⬆️⬆️⬆️ КОНЕЦ ГЛАВНОЙ ЛОГИКИ ОБРАБОТКИ КАДРА ⬆️⬆️⬆️ ---
-
 
     // --- Запуск и интервал (из v6.0) ---
     async function startDetection() {
