@@ -259,6 +259,46 @@
             padding: 8px 15px; border-radius: 6px; z-index: 150;
             border: 1px solid var(--border-color); backdrop-filter: blur(5px);
         }
+        .alerts-panel {
+    background-color: #2d333b; /* Темный фон */
+    padding: 10px;
+    border-radius: 6px;
+    margin-bottom: 15px;
+    border: 1px solid var(--accent-red, #f85149); /* Красная рамка для привлечения внимания */
+}
+
+.alerts-panel h2 {
+    color: var(--accent-red, #f85149);
+    margin-top: 0;
+    font-size: 1.2em;
+    text-align: center;
+}
+
+#alertsList {
+    list-style-type: none;
+    padding-left: 0;
+    max-height: 200px; /* Ограничение высоты, если много алертов */
+    overflow-y: auto; /* Прокрутка */
+}
+
+#alertsList li {
+    background-color: #373e47;
+    padding: 8px;
+    margin-bottom: 5px;
+    border-radius: 4px;
+    font-size: 0.9em;
+    border-left: 3px solid var(--accent-yellow, #eebb44);
+}
+
+#alertsList li.high-priority { /* Для особо важных */
+    border-left: 3px solid var(--accent-red, #f85149);
+    font-weight: bold;
+}
+
+.client-card.alert-active { /* Стиль для карточки клиента с активным алертом */
+    border: 2px solid var(--accent-red, #f85149) !important;
+    box-shadow: 0 0 10px var(--accent-red, #f85149);
+}
     </style>
 </head>
 <body>
@@ -277,6 +317,33 @@
                 <div id="recentVisitsContent">
                 </div>
             </div>
+        
+
+    <div class="sidebar"> <div class="alerts-panel">
+        <h2>🔥 Срочные Оповещения / Горячие Клиенты</h2>
+            <ul id="alertsList">
+                <li>Нет активных оповещений...</li>
+            </ul>
+        </div>
+        <hr> 
+        <h2>Активные клиенты:</h2>
+        <div id="dashboardContent">
+            </div>
+        
+        <hr>
+        
+        <h2 id="recentVisitsTitle" style="display: none;">Последние визиты:</h2>
+        <div id="recentVisitsContent">
+            </div>
+    </div>
+
+
+
+
+
+
+
+
 
 
     <div id="statusText">Инициализация системы...</div>
