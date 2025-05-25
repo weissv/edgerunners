@@ -815,22 +815,93 @@ function updateDashboard() {
         for (const d of detections) {
             if (!d.descriptor || !d.detection || !d.detection.box) continue;
 
-            let client = null; let currentLabelForFace = null;
-            let isKnownByMainMatcher = false; let isRecognizedAsUnregistered = false;
+            let client = null;
+            let currentLabelForFace = null;
+            let isKnownByMainMatcher = false;
+            let isRecognizedAsUnregistered = false;
             const currentDescriptor = d.descriptor;
+
             const bestMatch = faceMatcher ? faceMatcher.findBestMatch(currentDescriptor) : { label: 'unknown', distance: Infinity };
 
-            // 1-4. Логика определения currentLabelForFace (известные, unreg, re-id unknown, new unknown)
-            // ... (этот блок кода остается без изменений, как в предыдущей версии) ...
-            if (bestMatch.label !== 'unknown') { /* ... */ } else { /* ... unreg check ... */ }
-            if (!currentLabelForFace) { /* ... active unknown check ... */ }
-            if (!currentLabelForFace) { sessionCounter++; currentLabelForFace = `unknown_${sessionCounter}`; }
+            // 1. Проверка известных лиц
+            if (bestMatch.label !== 'unknown') {
+                currentLabelForFace = bestMatch.label;
+                isKnownByMainMatcher = true;
+            } else {
+                // 2. Проверка незарегистрированных (unreg_X)
+                let bestUnregMatchId = null;
+                let minUnregDistance = SIMILARITY_THRESHOLD_FOR_UNREGISTERED_MATCH; // Попробуйте 0.53 или 0.54
 
+                for (const [unregId, unregData] of unregisteredFaces.entries()) {
+                    for (const storedDesc of unregData.descriptors) {
+                        const dist = faceapi.euclideanDistance(currentDescriptor, storedDesc);
+                        if (dist < minUnregDistance) {
+                            minUnregDistance = dist; bestUnregMatchId = unregId;
+                        }
+                    }
+                }
+
+                if (bestUnregMatchId) {
+                    currentLabelForFace = bestUnregMatchId;
+                    isRecognizedAsUnregistered = true;
+                    const unregData = unregisteredFaces.get(currentLabelForFace);
+                    if (unregData) {
+                        unregData.lastSeen = now;
+                        if (unregData.descriptors.length < MAX_DESCRIPTORS_PER_UNREGISTERED) {
+                            let isFarEnough = !unregData.descriptors.some(desc => faceapi.euclideanDistance(currentDescriptor, desc) < MIN_DISTANCE_FOR_NEW_UNREG_DESCRIPTOR);
+                            if (isFarEnough) {
+                                unregData.descriptors.push(currentDescriptor);
+                                console.log(`[UNREG UPDATE]: Добавлен ${unregData.descriptors.length}-й дескриптор для ${currentLabelForFace}.`);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 3. Проверка активных неизвестных (unknown_X)
+            if (!currentLabelForFace) {
+                let bestActiveUnknownMatchId = null;
+                let minActiveUnknownDist = 0.58; // <<< УСТАНОВЛЕН НАЧАЛЬНЫЙ ПОВЫШЕННЫЙ ПОРОГ (0.58 - 0.60)
+
+                for (const [activeId, activeClientObj] of activeClients.entries()) { // Изменил activeClient на activeClientObj чтобы не было конфликта с client выше
+                    if (activeId.startsWith('unknown_')) {
+                        let descriptorToMatchAgainst = activeClientObj.descriptor;
+                        
+                        if (activeClientObj.tempQualityDescriptors && activeClientObj.tempQualityDescriptors.length > 0) {
+                            const repDesc = getRepresentativeDescriptor(activeClientObj.tempQualityDescriptors);
+                            if (repDesc) {
+                                descriptorToMatchAgainst = repDesc;
+                            }
+                        }
+
+                        if (descriptorToMatchAgainst) {
+                            const dist = faceapi.euclideanDistance(currentDescriptor, descriptorToMatchAgainst);
+                            // console.log(`      -> Re-ID Check with ${activeId} (using ${descriptorToMatchAgainst === activeClientObj.descriptor ? 'last' : 'rep.'} desc), Dist: ${dist.toFixed(3)}`);
+                            if (dist < minActiveUnknownDist) {
+                                minActiveUnknownDist = dist; bestActiveUnknownMatchId = activeId;
+                            }
+                        }
+                    }
+                }
+                if (bestActiveUnknownMatchId) {
+                    currentLabelForFace = bestActiveUnknownMatchId;
+                    console.log(`[RE-ID UNKNOWN]: Лицо (${currentLabelForFace}) переопознано (Dist: ${minActiveUnknownDist.toFixed(3)})`);
+                }
+            }
+
+            // 4. Если все еще не опознан - создаем НОВЫЙ unknown_X
+            if (!currentLabelForFace) {
+                sessionCounter++;
+                currentLabelForFace = `unknown_${sessionCounter}`;
+            }
 
             // 5. Получаем или Создаем состояние клиента
             if (!activeClients.has(currentLabelForFace)) {
                 client = createClientState(currentLabelForFace, currentDescriptor, d, isKnownByMainMatcher);
-                if(isRecognizedAsUnregistered) { /* ... */ }
+                if(isRecognizedAsUnregistered) {
+                    const unregData = unregisteredFaces.get(currentLabelForFace);
+                    if (unregData) { client.age = unregData.ageEstimate || client.age; client.gender = unregData.genderEstimate || client.gender; }
+                }
                 activeClients.set(currentLabelForFace, client);
                 console.log(`[ПОЯВИЛСЯ]: ${currentLabelForFace} (Известен: ${isKnownByMainMatcher}, Как незарег: ${isRecognizedAsUnregistered})`);
             } else {
@@ -840,54 +911,72 @@ function updateDashboard() {
             if (!client) { console.error("ОШИБКА: Клиент не найден для", currentLabelForFace); continue; }
 
             // 7. Обновляем данные клиента
-            client.lastSeen = now; client.box = d.detection.box; client.descriptor = currentDescriptor;
-            // ... (обновление tempQualityDescriptors, age, gender, emotions - без изменений) ...
-             if (!isKnownByMainMatcher && !isRecognizedAsUnregistered && client.id.startsWith('unknown_') && client.tempQualityDescriptors) { /* ... */ }
-            if (d.age) { /* ... */ } else { client.isAgeReliable = false; }
-            client.gender = d.gender || client.gender;
-            if (d.expressions) { /* ... */ }
+            client.lastSeen = now;
+            client.box = d.detection.box;
+            client.descriptor = currentDescriptor; // Всегда обновляем последний дескриптор
 
+            // Накопление tempQualityDescriptors для unknown
+            if (!isKnownByMainMatcher && !isRecognizedAsUnregistered && client.id.startsWith('unknown_')) {
+                 const box = d.detection.box; const faceArea = box.width * box.height;
+                 if (faceArea > MIN_FACE_AREA_TO_SAVE_AS_UNREG && client.tempQualityDescriptors) {
+                    client.tempQualityDescriptors.push(currentDescriptor);
+                    if (client.tempQualityDescriptors.length > MAX_TEMP_DESCRIPTORS_FOR_UNKNOWN + 2) { // Ограничиваем буфер
+                        client.tempQualityDescriptors.shift();
+                    }
+                 }
+            }
+            
+            // Обновление возраста
+            if (d.age) {
+                const box = d.detection.box; const faceArea = box.width * box.height;
+                if (faceArea > MIN_FACE_AREA_FOR_RELIABLE_AGE) {
+                    client.ageReadings.push(d.age);
+                    if (client.ageReadings.length > AGE_READINGS_BUFFER_SIZE) { client.ageReadings.shift(); }
+                    client.isAgeReliable = true;
+                } else { client.isAgeReliable = (client.ageReadings.length > 0); }
+                if (client.ageReadings.length > 0) { client.age = calculateMedian(client.ageReadings); }
+                else if (client.age === '?') { client.age = Math.round(d.age); client.isAgeReliable = (faceArea > MIN_FACE_AREA_FOR_RELIABLE_AGE); }
+            } else { client.isAgeReliable = false; }
+
+            client.gender = d.gender || client.gender; // Обновление пола
+
+            if (d.expressions) { // Обновление эмоций
+                client.emotionsHistory.push(d.expressions); if(client.emotionsHistory.length > 50) client.emotionsHistory.shift();
+                let currentDominant = 'neutral'; let maxProb = 0.4;
+                const latestExpressions = d.expressions;
+                if (latestExpressions) {
+                    for (const [emo, prob] of Object.entries(latestExpressions)) { if (prob > maxProb) { maxProb = prob; currentDominant = emo; } }
+                    client.dominantEmotion = currentDominant;
+                }
+            }
 
             seenLabelsThisFrame.add(currentLabelForFace);
 
-            // Проверка зон и <<< ЗАПИСЬ ПУТИ КЛИЕНТА >>>
+            // Проверка зон и ЗАПИСЬ ПУТИ КЛИЕНТА
             const previousZoneForPath = client.currentZone ? (interestZones[client.currentZone]?.name || client.currentZone) : null;
             const currentDetectedZoneKey = checkZone(client.box, interestZones);
 
             if (currentDetectedZoneKey && interestZones[currentDetectedZoneKey]) {
                 const currentDetectedZoneName = interestZones[currentDetectedZoneKey].name;
-                if (client.currentZone !== currentDetectedZoneKey) { // Вошел в новую зону
+                if (client.currentZone !== currentDetectedZoneKey) {
                     client.currentZone = currentDetectedZoneKey;
                     client.zoneEntryTime = now;
-
-                    // Запись в путь, если зона изменилась и это не первая зона для клиента
-                    // И если новая зона отличается от последней записанной в путь
                     if (currentDetectedZoneName && currentDetectedZoneName !== client.lastZoneForPathRec) {
-                        if (client.zonePath.length === 0 && client.entryTime === now) { // Первая зона при первом появлении
-                             client.zonePath.push(currentDetectedZoneName);
-                        } else if (previousZoneForPath && client.zonePath[client.zonePath.length -1] !== currentDetectedZoneName) { // Если это не первая зона вообще
-                            client.zonePath.push(currentDetectedZoneName);
-                        } else if (!previousZoneForPath && client.zonePath[client.zonePath.length -1] !== currentDetectedZoneName) { // Если до этого был вне зон
-                             client.zonePath.push(currentDetectedZoneName);
-                        }
+                        client.zonePath.push(currentDetectedZoneName); // Просто добавляем новую зону в путь
                         client.lastZoneForPathRec = currentDetectedZoneName;
                     }
                 }
-                // Обновляем время в текущей зоне и проверяем на "интерес"
                 client.viewedModels.set(currentDetectedZoneName, (client.viewedModels.get(currentDetectedZoneName) || 0) + 700);
                 if ((now - client.zoneEntryTime >= ZONE_THRESHOLD) && currentDetectedZoneKey !== 'Negotiation_Table' && currentDetectedZoneKey !== 'Manager_Desk' && !client.viewedModels.has(`${currentDetectedZoneName}_INTEREST`)) {
                     console.log(`[ИНТЕРЕС]: ${currentLabelForFace} к ${currentDetectedZoneName}`);
                     client.viewedModels.set(`${currentDetectedZoneName}_INTEREST`, true);
                 }
-            } else { // Клиент не в известной зоне
-                if (client.currentZone !== null) { // Если он только что вышел из зоны
-                     // Можно добавить логику "покинул зону X", если нужно
-                }
+            } else {
                 client.currentZone = null;
                 client.zoneEntryTime = null;
-                client.lastZoneForPathRec = null; // Сбрасываем, чтобы при входе в новую зону она записалась
+                // client.lastZoneForPathRec = null; // Сбрасываем, если нужно, чтобы при возвращении в зону она снова записалась, если это желаемое поведение
             }
-
+            
             // Живая аналитика и флаги оповещений
             const liveAnalysis = analyzePurchaseLikelihood(client, activeClients);
             client.livePurchaseLikelihood = liveAnalysis.likelihood;
@@ -901,7 +990,7 @@ function updateDashboard() {
             if (client.liveTestDriveInterest === 'Высокий') { alertMessages.push("Высокий интерес к Тест-Драйву!"); }
             const managerDeskName = interestZones['Manager_Desk']?.name || 'Стойка менеджера';
             let carViewedBeforeManager = false;
-            if (client.currentZone === managerDeskName && (now - client.zoneEntryTime > 15000)) { // У менеджера > 15 сек
+            if (client.currentZone === managerDeskName && (now - (client.zoneEntryTime || now) > 15000)) { // У менеджера > 15 сек
                 client.viewedModels.forEach((time, modelName) => {
                     if (modelName !== managerDeskName && modelName !== (interestZones['Negotiation_Table']?.name || 'Стол переговоров') && (time / 1000) > 15) {
                         carViewedBeforeManager = true;
@@ -912,13 +1001,50 @@ function updateDashboard() {
             if (alertMessages.length > 0) { client.alertMessage = alertMessages.join(' | '); }
 
             faceapi.draw.drawDetections(canvas, d);
-            // drawClientInfo(ctx, client.box, client); // Оставляем для отладки, если нужно
+            // drawClientInfo(ctx, client.box, client); 
 
-            if (!isFormOpen && !isDossierOpen) { /* ... логика форм/досье ... */ }
+            if (!isFormOpen && !isDossierOpen) {
+                if (client.isKnown && clientDataMap.has(client.id)) {
+                    showDossier(clientDataMap.get(client.id));
+                } else if (!client.isKnown && !client.registrationTriggered && (now - client.entryTime > REGISTRATION_DELAY)) {
+                    if (client.age !== '?' && client.gender !== '?') {
+                        client.registrationTriggered = true;
+                        showRegistrationForm(client.age, client.gender, client.id);
+                    }
+                }
+            }
         } // Конец for (const d of detections)
 
         // Обработка ушедших и сохранение незарегистрированных
-        for (const [label, client] of activeClients.entries()) { /* ... без изменений ... */ }
+        for (const [label, client] of activeClients.entries()) {
+            if (!seenLabelsThisFrame.has(label)) {
+                if (now - client.lastSeen > INACTIVITY_TIMEOUT) {
+                    client.timeSpent = client.lastSeen - client.entryTime;
+                    // Проверка на отрицательное время перед отправкой, если вдруг lastSeen < entryTime
+                    if (client.timeSpent < 0) client.timeSpent = 0; 
+                    console.log(`[УШЕЛ]: ${label}. Время: ${(client.timeSpent / 1000).toFixed(0)}с.`);
+                    await sendClientDataToServer(client);
+                    activeClients.delete(label);
+                    if (isDossierOpen && dossierDisplayPanel.style.display === 'block' && (formLinkedClientId === label || (client.isKnown && clientDataMap.get(label) && dossierName.textContent === clientDataMap.get(label).name))) { hideDossier(); }
+                    if (isFormOpen && registrationForm.style.display === 'block' && formLinkedClientId === label) { hideRegistrationForm(); }
+                }
+            } else {
+                 if (!client.isKnown && client.id.startsWith('unknown_') && !unregisteredFaces.has(client.id) && client.tempQualityDescriptors && client.tempQualityDescriptors.length >= MIN_QUALITY_DESCRIPTORS_TO_SAVE_UNREG && (now - client.entryTime > MIN_TIME_TO_SAVE_UNKNOWN_AS_UNREG) ) {
+                    unregIdCounter++; const newUnregId = `unreg_${unregIdCounter}`;
+                    const repDescriptor = getRepresentativeDescriptor(client.tempQualityDescriptors);
+                    if(repDescriptor){
+                        unregisteredFaces.set(newUnregId, { id: newUnregId, descriptors: [repDescriptor], firstSeen: client.entryTime, lastSeen: now, ageEstimate: client.age, genderEstimate: client.gender });
+                        console.log(`[NEW UNREG]: ${client.id} сохранен как ${newUnregId}.`);
+                        const oldClientData = activeClients.get(client.id);
+                        if(oldClientData){
+                            oldClientData.id = newUnregId; oldClientData.tempQualityDescriptors = [];
+                            activeClients.delete(label); activeClients.set(newUnregId, oldClientData);
+                            if (formLinkedClientId === label) { formLinkedClientId = newUnregId; if(clientIdInput) clientIdInput.value = newUnregId; }
+                        }
+                    } else { console.warn("Не удалось получить репр. дескриптор для", client.id); }
+                }
+            }
+        }
         if(statusText) statusText.innerText = `Активных: ${activeClients.size} (Незарег: ${unregisteredFaces.size}) Форма: ${isFormOpen} Досье: ${isDossierOpen}`;
     }
     // --- Запуск и интервал (из v6.0) ---
