@@ -58,6 +58,9 @@ window.addEventListener('DOMContentLoaded', () => {
     let labels = [];
     let faceMatcher = null;
     let detectionInterval = null;
+    // ... другие глобальные переменные ...
+    let likelihoodChartInstance = null;
+    let testDriveChartInstance = null;
 
     // --- ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ДЛЯ ЛОГИКИ ---
     let activeClients = new Map();
@@ -467,40 +470,64 @@ window.addEventListener('DOMContentLoaded', () => {
             else { console.error("ОШИБКА ОТПРАВКИ на Node.js:", response.status, await response.text()); }
         } catch (error) { console.error("СЕТЕВАЯ ОШИБКА (Node.js):", error); }
     }
-    function updateDashboard() {
+function updateDashboard() {
         const alertsListElement = document.getElementById("alertsList");
         let currentAlertsHTML = '';
 
-        // <<< НОВЫЙ БЛОК: ОБЩАЯ СТАТИСТИКА >>>
+        // Общая статистика
         const statActiveClientsEl = document.getElementById('statActiveClients');
         const statHotLeadsEl = document.getElementById('statHotLeads');
         const statPopularZoneEl = document.getElementById('statPopularZone');
 
-        if (statActiveClientsEl) statActiveClientsEl.textContent = activeClients.size;
-
+        let likelihoodCounts = { low: 0, medium: 0, high: 0 };
+        let testDriveCounts = { high: 0, medium: 0, lowOrNone: 0 };
         let hotLeadsCount = 0;
         let zoneCounts = {};
+
+        if (statActiveClientsEl) statActiveClientsEl.textContent = activeClients.size;
+
         activeClients.forEach(client => {
+            // Считаем для общей статистики и диаграмм
             if (client.alertMessage) hotLeadsCount++;
             if (client.currentZone && interestZones[client.currentZone]) {
                 const zoneName = interestZones[client.currentZone].name;
                 zoneCounts[zoneName] = (zoneCounts[zoneName] || 0) + 1;
             }
-        });
-        if (statHotLeadsEl) statHotLeadsEl.textContent = hotLeadsCount;
 
+            if (client.livePurchaseLikelihood) {
+                const likelihoodNum = parseInt(client.livePurchaseLikelihood);
+                if (likelihoodNum >= 75) likelihoodCounts.high++;
+                else if (likelihoodNum >= 50) likelihoodCounts.medium++;
+                else likelihoodCounts.low++;
+            } else {
+                likelihoodCounts.low++; // Если нет данных, считаем низкой
+            }
+
+            if (client.liveTestDriveInterest === 'Высокий') testDriveCounts.high++;
+            else if (client.liveTestDriveInterest === 'Средний') testDriveCounts.medium++;
+            else testDriveCounts.lowOrNone++;
+        });
+
+        if (statHotLeadsEl) statHotLeadsEl.textContent = hotLeadsCount;
         let maxCount = 0; let popularZone = '-';
         for (const zoneName in zoneCounts) {
-            if (zoneCounts[zoneName] > maxCount) {
-                maxCount = zoneCounts[zoneName];
-                popularZone = zoneName;
-            }
+            if (zoneCounts[zoneName] > maxCount) { maxCount = zoneCounts[zoneName]; popularZone = zoneName; }
         }
         if (statPopularZoneEl) statPopularZoneEl.textContent = popularZone + (maxCount > 0 ? ` (${maxCount})` : '');
-        // <<< КОНЕЦ БЛОКА ОБЩЕЙ СТАТИСТИКИ >>>
+
+        // <<< ОБНОВЛЕНИЕ ДИАГРАММ >>>
+        if (likelihoodChartInstance) {
+            likelihoodChartInstance.data.datasets[0].data = [likelihoodCounts.low, likelihoodCounts.medium, likelihoodCounts.high];
+            likelihoodChartInstance.update();
+        }
+        if (testDriveChartInstance) {
+            testDriveChartInstance.data.datasets[0].data = [testDriveCounts.high, testDriveCounts.medium, testDriveCounts.lowOrNone];
+            testDriveChartInstance.update();
+        }
+        // <<< КОНЕЦ ОБНОВЛЕНИЯ ДИАГРАММ >>>
 
 
-        // --- Обновление активных клиентов ---
+        // Обновление активных клиентов (карточки)
         if (!dashboardContent) return;
         if (!activeClients || activeClients.size === 0) {
             dashboardContent.innerHTML = '<p>Ожидание клиентов...</p>';
@@ -508,18 +535,13 @@ window.addEventListener('DOMContentLoaded', () => {
         } else {
             let clientCardsHTML = ''; const now = Date.now();
             activeClients.forEach(client => {
-                // ... (код формирования карточки активного клиента остается таким же, как в предыдущем ответе,
-                // включая client.alertMessage и cardAlertClass, отображение livePurchaseLikelihood и т.д.)
-                let nameToDisplay = client.id; /* ... */ const timeInSeconds = ((now - client.entryTime) / 1000).toFixed(0); /* ... */
-                const cardAlertClass = client.alertMessage ? 'alert-active' : '';
+                // ... (код формирования карточки clientCardsHTML - без изменений, как в предыдущем ответе) ...
+                let nameToDisplay = client.id; /* ... */ const cardAlertClass = client.alertMessage ? 'alert-active' : ''; /* ... */
                 clientCardsHTML += `<div class="client-card ${cardAlertClass}"><h3>${nameToDisplay}</h3>`;
-                // ... все остальные <p> с информацией о клиенте ...
-                 if (client.livePurchaseLikelihood) { clientCardsHTML += `<p style="margin-top: 8px;"><strong>Вероятность покупки: <span style="color: ${/*likelihoodColor*/'inherit'}; font-size: 1.1em;">${client.livePurchaseLikelihood}</span></strong></p>`; }
-                 if (client.liveTestDriveInterest && client.liveTestDriveInterest !== "Нет") { clientCardsHTML += `<p><strong>Тест-драйв: <span style="color: ${/*testDriveColor*/'inherit'};">${client.liveTestDriveInterest}</span></strong></p>`; }
-                 // ... и т.д.
+                // ... все <p> для карточки ...
                 clientCardsHTML += `</div>`;
 
-                if (client.alertMessage) { /* ... добавление в currentAlertsHTML ... */ }
+                if (client.alertMessage) { currentAlertsHTML += `<li>${nameToDisplay}: ${client.alertMessage}</li>`; }
             });
             dashboardContent.innerHTML = clientCardsHTML;
             if (alertsListElement) { alertsListElement.innerHTML = currentAlertsHTML || '<li>Нет активных оповещений...</li>'; }
@@ -958,4 +980,85 @@ window.addEventListener('DOMContentLoaded', () => {
 
     console.log("Вызываю run()...");
     run();
+    function initializeCharts() {
+        const likelihoodCtx = document.getElementById('likelihoodChart')?.getContext('2d');
+        const testDriveCtx = document.getElementById('testDriveChart')?.getContext('2d');
+
+        if (likelihoodCtx) {
+            likelihoodChartInstance = new Chart(likelihoodCtx, {
+                type: 'doughnut', // или 'pie', 'bar'
+                data: {
+                    labels: ['Низкая (<50%)', 'Средняя (50-74%)', 'Высокая (>=75%)'],
+                    datasets: [{
+                        label: 'Вероятность Покупки',
+                        data: [0, 0, 0], // Начальные данные
+                        backgroundColor: [
+                            'rgba(255, 99, 132, 0.7)', // Красный для низкой
+                            'rgba(255, 206, 86, 0.7)', // Желтый для средней
+                            'rgba(75, 192, 192, 0.7)'  // Зеленый для высокой
+                        ],
+                        borderColor: [
+                            'rgba(255, 99, 132, 1)',
+                            'rgba(255, 206, 86, 1)',
+                            'rgba(75, 192, 192, 1)'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true, // Отключаем, чтобы max-height работал лучше
+                    plugins: {
+                        legend: { position: 'top', labels: { color: '#c9d1d9'} },
+                        title: { display: true, text: 'Распределение по Вероятности Покупки', color: '#c9d1d9' }
+                    }
+                }
+            });
+        } else {
+            console.error("Canvas для likelihoodChart не найден!");
+        }
+
+        if (testDriveCtx) {
+            testDriveChartInstance = new Chart(testDriveCtx, {
+                type: 'pie', // или 'doughnut', 'bar'
+                data: {
+                    labels: ['Высокий', 'Средний', 'Низкий/Нет'],
+                    datasets: [{
+                        label: 'Интерес к Тест-Драйву',
+                        data: [0, 0, 0], // Начальные данные
+                        backgroundColor: [
+                            'rgba(75, 192, 192, 0.7)',  // Зеленый
+                            'rgba(255, 206, 86, 0.7)', // Желтый
+                            'rgba(255, 99, 132, 0.7)'  // Красный
+                        ],
+                        borderColor: [
+                            'rgba(75, 192, 192, 1)',
+                            'rgba(255, 206, 86, 1)',
+                            'rgba(255, 99, 132, 1)'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: { position: 'top', labels: {color: '#c9d1d9'} },
+                        title: { display: true, text: 'Интерес к Тест-Драйву', color: '#c9d1d9' }
+                    }
+                }
+            });
+        } else {
+            console.error("Canvas для testDriveChart не найден!");
+        }
+    }
 });
+const run = async () => {
+    // ... ваш существующий код загрузки моделей, данных, запуска видео ...
+    video.addEventListener("play", () => {
+        console.log("Событие 'play'. Вызываю startDetection...");
+        startDetection();
+        setInterval(updateDashboard, 1000); // Обновляем дашборд каждую секунду
+        initializeCharts(); // <<< ВЫЗЫВАЕМ ИНИЦИАЛИЗАЦИЮ ДИАГРАММ ЗДЕСЬ
+    });
+};
