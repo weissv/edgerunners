@@ -10,19 +10,18 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script> <title>Анализ клиентов - Хакатон</title>
     <style>
         :root {
-            --bg-color: #0a0f14; /* Еще темнее, почти черный для "глубины" */
-            --surface-color: #161b22; /* Основной фон для элементов интерфейса */
-            --card-bg: #1f242c; /* Фон для индивидуальных карточек, чуть светлее */
+            --bg-color: #0a0f14;
+            --surface-color: #161b22;
+            --card-bg: #1f242c;
             --border-color: #30363d;
-            --text-primary: #e6edf3; /* Яркий белый для основного текста */
-            --text-secondary: #7d8590; /* Приглушенный для второстепенного */
-            --accent-blue: #388bfd; /* Более яркий синий */
+            --text-primary: #e6edf3;
+            --text-secondary: #7d8590;
+            --accent-blue: #388bfd;
             --accent-green: #2da44e;
             --accent-yellow: #d29922;
             --accent-red: #e5534b;
             --accent-purple: #a371f7;
             --font-main: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            --font-mono: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace; /* Для ID и "технических" данных */
         }
     
         * {
@@ -40,13 +39,11 @@
             align-items: center;
             padding: 20px;
             min-height: 100vh;
-            font-size: 15px; /* Базовый размер шрифта чуть меньше для "плотности" */
-            /* Убрал точки, можно вернуть если нужно:
-            background-image: radial-gradient(circle at 1px 1px, rgba(200, 200, 200, 0.03) 1px, transparent 0);
-            background-size: 28px 28px; */
+            font-size: 15px;
         }
     
-        .page-title { /* Новый класс для главного заголовка страницы */
+        /* Используйте этот класс для вашего основного заголовка <h1> */
+        .page-title {
             font-size: 1.8em;
             font-weight: 600;
             letter-spacing: 0.5px;
@@ -55,7 +52,7 @@
             padding-bottom: 15px;
             border-bottom: 1px solid var(--border-color);
             width: 100%;
-            max-width: 1200px;
+            max-width: 1180px; /* Совпадает с max-width .main-container + gap */
             text-align: center;
         }
     
@@ -66,26 +63,30 @@
             border: none;
             height: 1px;
             background-color: var(--border-color);
-            margin: 20px 0;
+            margin: 15px 0; /* Уменьшил отступы у hr */
         }
     
         /* --- Основной контейнер --- */
         .main-container {
             display: flex;
-            flex-wrap: wrap;
-            align-items: flex-start;
-            gap: 25px; /* Чуть больше отступ */
+            flex-wrap: nowrap; /* ЗАПРЕЩАЕМ ПЕРЕНОС по умолчанию для десктопа */
+            align-items: flex-start; /* Выравниваем по верху */
+            gap: 20px; /* Отступ между видео и сайдбаром */
             width: 100%;
-            max-width: 1200px; /* Увеличил немного */
+            max-width: 1180px; /* (720px видео + 400px сайдбар + 20px отступ + небольшой запас) */
+            margin-left: auto;
+            margin-right: auto;
         }
     
         #videoContainer {
-            flex: 3; /* Даем видео чуть больше приоритета */
-            min-width: 320px;
-            max-width: 720px; /* Оставим ограничение, чтобы не растягивалось */
+            flex-grow: 0; /* Не будет расти больше своего flex-basis/max-width */
+            flex-shrink: 1; /* Позволяем сжиматься, если нужно */
+            flex-basis: 720px; /* Желаемая ширина */
+            max-width: 720px;
+            min-width: 300px; /* Минимальная ширина, чтобы не ломался */
             aspect-ratio: 720 / 560;
             border: 1px solid var(--border-color);
-            border-radius: 8px; /* Менее круглые углы */
+            border-radius: 8px;
             box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
             background-color: #000;
             overflow: hidden;
@@ -102,82 +103,102 @@
     
         /* --- Сайдбар (Панель дашборда) --- */
         #dashboardPanel {
-            flex: 2; /* Сайдбар занимает значительную часть */
-            min-width: 320px;
-            max-width: 400px; /* Чуть шире для информации */
+            flex-grow: 1; /* Позволяем расти, чтобы занять оставшееся место */
+            flex-shrink: 1; /* Позволяем сжиматься */
+            flex-basis: 360px; /* Начальная ширина, может быть меньше max-width */
+            max-width: 400px; /* Максимальная ширина */
+            min-width: 300px;
             background-color: var(--surface-color);
             border: 1px solid var(--border-color);
             border-radius: 8px;
-            padding: 20px;
+            padding: 15px 20px; /* Слегка изменил padding */
             box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
-            height: calc( (100vw - 40px - 25px) * (2/5) * (560/720) ); /* Попытка сохранить пропорцию, если видео не макс. ширины */
-            max-height: 560px; /* Ограничиваем высоту сайдбара высотой видео по умолчанию */
+            /* Высота сайдбара будет по контенту, но не более высоты видео на десктопе */
+            /* Для этого можно использовать JS или align-items: stretch на .main-container, если все дети должны быть одной высоты */
+            /* Пока оставим height: auto и добавим max-height для предотвращения чрезмерного растягивания */
+            height: auto;
+            max-height: 560px; /* Примерно как видео, чтобы не растягивалось сильно, если контента мало */
             overflow-y: auto;
             display: flex;
             flex-direction: column;
-            gap: 18px; /* Отступы между блоками */
+            gap: 15px;
         }
         #dashboardPanel > h2 { /* Общий заголовок сайдбара */
             text-align: center;
             padding-bottom: 10px;
             border-bottom: 1px solid var(--border-color);
-            margin-bottom: 0; /* Убираем отступ, так как gap есть */
+            margin-bottom: 0;
             font-size: 1.2em;
             color: var(--text-primary);
         }
-         #dashboardPanel > hr { margin: 0; } /* Убираем стандартные отступы hr, gap сделает свое дело */
+        #dashboardPanel > hr { margin: 0; }
     
     
         /* Блоки внутри сайдбара */
-        .overall-stats, .alerts-panel, .charts-container, #dashboardContentContainer, #recentVisitsContainer {
-            padding: 15px;
-            background-color: var(--card-bg); /* Карточный фон для блоков */
+        .overall-stats, .alerts-panel, .charts-container,
+        #dashboardContentContainer, /* Если вы решите обернуть #dashboardContent */
+        #recentVisitsContainer  /* Если вы решите обернуть #recentVisitsContent */
+        {
+            padding: 12px 15px; /* Уменьшил padding */
+            background-color: var(--card-bg);
             border-radius: 6px;
             border: 1px solid var(--border-color);
         }
-        .overall-stats h3, .alerts-panel h3, .charts-container h3, #dashboardContentContainer > h3, #recentVisitsContainer > h3 {
-            margin-top: 0; margin-bottom: 12px;
-            font-size: 1em; color: var(--text-primary); /* Заголовки блоков чуть ярче */
-            font-weight: 500; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;
+         /* Заголовки для секций внутри сайдбара (если используете <h3> для Активные клиенты и Последние визиты) */
+        #dashboardPanel > h3 {
+            margin-top: 0; margin-bottom: 10px;
+            font-size: 1.05em; color: var(--text-primary);
+            font-weight: 500; border-bottom: 1px solid var(--border-color);
+            padding-bottom: 8px;
         }
     
+    
+        .overall-stats h3, .alerts-panel h3, .charts-container h3 {
+            margin-top: 0; margin-bottom: 10px;
+            font-size: 1em; color: var(--text-secondary);
+            text-align: left; font-weight: 500;
+            border-bottom: none; padding-bottom: 5px; /* Убрал линию у этих подзаголовков */
+        }
         .overall-stats p { display: flex; justify-content: space-between; font-size: 0.9em; color: var(--text-secondary); margin-bottom: 6px; }
         .overall-stats p span { font-weight: 600; color: var(--accent-blue); }
     
-        .alerts-panel h3 { color: var(--accent-red); }
+        .alerts-panel h3 { color: var(--accent-red); } /* Заголовок алертов */
         #alertsList { list-style-type: none; max-height: 120px; overflow-y: auto; font-size: 0.85em; }
         #alertsList li {
-            background-color: var(--surface-bg); /* Чуть темнее для элементов списка */
+            background-color: var(--surface-color);
             padding: 8px 10px; margin-bottom: 6px; border-radius: 4px;
             border-left: 3px solid var(--accent-yellow); color: var(--text-primary);
         }
         #alertsList li.high-priority { border-left-color: var(--accent-red); font-weight: 600; }
     
+        .charts-container h3 { color: var(--text-secondary); } /* Заголовок чартов */
         .chart-wrapper { margin-bottom: 10px; }
-        #likelihoodChart, #testDriveChart { max-height: 180px !important; } /* Уменьшил высоту чартов */
+        #likelihoodChart, #testDriveChart { max-height: 180px !important; }
     
-        #dashboardContent { /* Контейнер для карточек активных клиентов */
-            display: flex; flex-direction: column; gap: 10px;
-        }
     
+        #dashboardContent { display: flex; flex-direction: column; gap: 10px; }
         .client-card {
-            background-color: var(--surface-bg); /* Тот же фон что и у блоков */
+            background-color: var(--surface-color);
             border: 1px solid var(--border-color);
-            border-left: 3px solid var(--accent-blue); /* Акцентная линия слева */
-            border-radius: 4px; /* Менее круглые */
+            border-left: 4px solid var(--accent-blue);
+            border-radius: 4px;
             padding: 10px 12px;
             font-size: 0.9em;
             transition: box-shadow 0.2s ease, border-color 0.2s ease;
         }
         .client-card:hover { border-color: var(--accent-blue); }
-        .client-card.alert-active { border-left-color: var(--accent-red) !important; border-color: var(--accent-red); }
+        .client-card.alert-active {
+            border-left-color: var(--accent-red) !important;
+            border-color: var(--accent-red) !important;
+            box-shadow: 0 0 8px rgba(248, 81, 73, 0.3);
+        }
         .client-card h3 {
             margin-top: 0; margin-bottom: 8px; font-size: 1.05em;
             color: var(--text-primary); font-weight: 600;
         }
-        .client-card p { margin: 3px 0; color: var(--text-secondary); font-size: 0.9em; display: flex; justify-content: space-between; }
+        .client-card p { margin: 3px 0; color: var(--text-secondary); font-size: 0.9em; display: flex; justify-content: space-between; align-items: center; }
         .client-card p span { color: var(--text-primary); font-weight: 400; text-align: right; }
-        .client-card p strong span { font-weight: 600; /* Для выделения вероятности и т.д. */ }
+        .client-card p strong span { font-weight: 600; }
         .client-card ul { list-style: none; padding-left: 0; margin-top: 6px; }
         .client-card li {
             background-color: var(--dark-bg);
@@ -186,40 +207,79 @@
         }
     
         #recentVisitsContent .visit-summary-card {
-            background-color: var(--surface-bg);
+            background-color: var(--surface-color);
             border: 1px solid var(--border-color);
-            border-left: 3px solid var(--accent-purple); /* Другой акцент для истории */
+            border-left: 4px solid var(--accent-purple);
             border-radius: 4px; padding: 10px 12px; margin-bottom: 8px;
             font-size: 0.85em;
         }
         .visit-summary-card .client-name { font-size: 1em; font-weight: 600; color: var(--text-primary); }
-        /* ... остальные стили для visit-summary-card можно адаптировать по аналогии с client-card ... */
+        .visit-summary-card .timestamp { font-size: 0.8em; color: var(--text-secondary); float: right; }
+        .visit-summary-card p { margin: 4px 0; line-height: 1.5; }
+        .visit-summary-card p.goal { margin-top: 6px; font-weight: 500; }
+        .visit-summary-card small { color: var(--text-secondary); display: block; margin-top: 2px;}
+        .visit-summary-card small strong { color: var(--text-primary); }
     
     
         /* --- Всплывающие панели (Форма, Досье) --- */
-        .info-panel { /* Стили как в вашем примере, но можно проверить размеры и отступы */
+        .info-panel {
             position: fixed; top: 50%; left: 50%;
             transform: translate(-50%, -50%) scale(0.95);
-            background-color: var(--card-bg); /* Используем card-bg, а не surface-bg для модалок */
-            padding: 25px 30px; border-radius: 8px; /* Меньше радиус */
+            background-color: var(--surface-color); /* Немного светлее основного фона модалки */
+            padding: 25px 30px; border-radius: 8px;
             box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
-            z-index: 1000; width: 90%; max-width: 450px; /* Чуть шире */
+            z-index: 1000; width: 90%; max-width: 450px;
             display: none; border: 1px solid var(--border-color);
             opacity: 0; transition: opacity 0.2s ease-out, transform 0.2s ease-out;
         }
         .info-panel.active { display: block; opacity: 1; transform: translate(-50%, -50%) scale(1); }
-        /* ... остальные стили для info-panel h2, label, input, button-group ... */
-        .info-panel button { font-size: 0.95em; padding: 9px 18px; }
+        .info-panel h2 { font-size: 1.3em; margin-bottom: 25px; text-align: center; color: var(--text-primary); }
+        .info-panel label, .info-panel .dossier-label { display: block; margin-bottom: 5px; color: var(--text-secondary); font-size: 0.9em; font-weight: 500; }
+        .info-panel input, .info-panel select, .info-panel textarea {
+            width: 100%; padding: 10px 12px; margin-bottom: 15px;
+            border: 1px solid var(--border-color); border-radius: 4px;
+            background-color: var(--dark-bg); color: var(--text-primary);
+            box-sizing: border-box; font-size: 0.95em;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        .info-panel input:focus, .info-panel select:focus, .info-panel textarea:focus {
+            border-color: var(--accent-blue); outline: none;
+            box-shadow: 0 0 0 2px rgba(56, 139, 253, 0.2);
+        }
+        .info-panel input[readonly] { background-color: #282e35; cursor: not-allowed; }
+        .info-panel .button-group { display: flex; justify-content: flex-end; margin-top: 20px; gap: 10px; }
+        .info-panel button {
+            padding: 9px 18px; border: none; border-radius: 4px; cursor: pointer;
+            font-size: 0.95em; font-weight: 500; transition: all 0.2s ease;
+        }
+        .info-panel button.save, .info-panel button.action { background: var(--accent-blue); color: white; }
+        .info-panel button.save:hover, .info-panel button.action:hover { background-color: #2c7de8; }
+        .info-panel button.close { background-color: var(--border-color); color: var(--text-primary); }
+        .info-panel button.close:hover { background-color: #484F58; }
+        /* Стили для досье внутри info-panel */
+        #dossierDisplayPanel .dossier-field { margin-bottom: 12px; }
+        #dossierDisplayPanel .dossier-value {
+            display: block; background-color: var(--dark-bg); color: var(--text-primary);
+            padding: 8px 12px; border-radius: 4px; border: 1px solid var(--border-color);
+            font-size: 0.95em; word-wrap: break-word;
+        }
+        #dossierDisplayPanel ul { /* История визитов */
+            list-style: none; padding: 0; margin-top: 5px;
+            max-height: 120px; overflow-y: auto;
+            background-color: var(--dark-bg); border: 1px solid var(--border-color); border-radius: 4px; padding: 8px;
+        }
+        #dossierDisplayPanel li { padding: 6px; margin-bottom: 4px; background-color: var(--surface-color); border-radius: 3px; font-size: 0.9em; }
+        #dossierDisplayPanel li span { display: block; font-size: 0.8em; color: var(--text-secondary); margin-top: 2px;}
     
         /* Статус текст внизу */
         #statusText {
-            position: fixed; bottom: 15px; left: 50%; transform: translateX(-50%);
+            position: fixed; bottom: 10px; left: 50%; transform: translateX(-50%);
             color: var(--text-secondary); font-size: 0.8em; background-color: rgba(22, 27, 34, 0.9);
             padding: 6px 12px; border-radius: 4px; z-index: 150;
             border: 1px solid var(--border-color); backdrop-filter: blur(3px);
         }
     
-        /* Скроллбар */
+        /* Скроллбар для сайдбара */
         #dashboardPanel::-webkit-scrollbar { width: 6px; }
         #dashboardPanel::-webkit-scrollbar-track { background: var(--surface-color); border-radius: 10px; }
         #dashboardPanel::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 10px; }
@@ -227,52 +287,65 @@
     
     
         /* === Мобильная Адаптация === */
-        @media (max-width: 1024px) { /* Более ранний переход на вертикаль, если сайдбар широкий */
+        @media (max-width: 992px) { /* Точка перелома для планшетов/маленьких ноутбуков */
             .main-container {
                 flex-direction: column;
                 align-items: center;
+                flex-wrap: nowrap;
             }
             #videoContainer {
+                flex-basis: auto;
                 width: 100%;
-                max-width: 640px; /* На планшетах может быть не на всю ширину */
-                height: auto;
+                max-width: 680px; /* Видео может быть немного шире на планшете */
             }
             #dashboardPanel {
+                flex-basis: auto;
                 width: 100%;
-                max-width: 640px; /* Той же ширины, что и видео */
-                height: auto; /* По содержимому */
-                min-height: 0;
+                max-width: 680px;
                 margin-top: 20px;
-                max-height: none; /* Убираем ограничение по высоте от видео */
+                height: auto;
+                max-height: none; /* Убираем ограничение по высоте */
             }
-            .charts-container {
-                display: flex;
-                flex-direction: column; /* Чарты всегда друг под другом на мобильных */
+        }
+    
+        @media (max-width: 768px) { /* Планшеты в портрете и большие телефоны */
+            body {
+                padding: 15px 10px;
             }
-             #likelihoodChart, #testDriveChart { max-height: 220px !important; }
+            .page-title {
+                font-size: 1.5em; /* Уменьшаем заголовок страницы */
+                margin-bottom: 25px;
+            }
+            #dashboardPanel { padding: 15px; }
+    
+            .charts-container { flex-direction: column; gap: 15px; }
+            #likelihoodChart, #testDriveChart { max-height: 200px !important; }
+    
+            .info-panel { width: calc(100% - 20px); padding: 20px 15px; }
         }
     
         @media (max-width: 480px) { /* Совсем маленькие экраны */
-            body { padding: 10px; font-size:14px; }
-            .page-title { font-size: 1.3em; margin-bottom: 20px; }
-            h2 { font-size: 1.15em; }
-            h3 { font-size: 1em; }
+            body { padding: 10px 5px; font-size:13px; } /* Уменьшаем базовый шрифт */
+            .page-title { font-size: 1.3em; }
+            h2 { font-size: 1.1em; }
+            h3 { font-size: 0.95em; }
     
-            #dashboardPanel { padding: 15px; }
-            .overall-stats, .alerts-panel, .charts-container, #dashboardContentContainer, #recentVisitsContainer {
-                 padding: 12px;
+            #dashboardPanel { gap: 12px; } /* Уменьшаем отступы в сайдбаре */
+            .overall-stats, .alerts-panel, .charts-container, #dashboardContentContainer, #recentVisitsContainer,
+            .client-card, #recentVisitsContent .visit-summary-card {
+                 padding: 10px;
+                 font-size: 0.85em;
             }
-            .client-card, #recentVisitsContent .visit-summary-card { padding: 10px; font-size: 0.85em; }
             .client-card h3 { font-size: 1em; }
+            .client-card p { font-size: 0.9em; }
     
-            .info-panel { width: calc(100% - 20px); padding: 20px 15px; }
             .info-panel h2 { font-size: 1.1em; }
             .info-panel button { font-size: 0.9em; padding: 8px 15px; }
     
-            #statusText { font-size: 0.75em; padding: 4px 8px; }
+            #statusText { font-size: 0.75em; padding: 4px 8px; bottom: 5px; }
         }
     </style>
-</head>
+    </head>
 <body>
     <div class="main-container">
         <h1>Face Recognition System</h1> <div class="main-container">
