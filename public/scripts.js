@@ -680,18 +680,26 @@ window.addEventListener('DOMContentLoaded', () => {
             if (bestMatch.label !== 'unknown') {
                 currentLabelForFace = bestMatch.label; isKnownByMainMatcher = true;
                 client = activeClients.get(currentLabelForFace);
-            } else {
-                let bestUnregMatchId = null; let minUnregDistance = SIMILARITY_THRESHOLD_FOR_UNREGISTERED_MATCH;
+            } // ... (Код после проверки bestMatch.label !== 'unknown') ...
+            else {
+                // Пытаемся найти совпадение среди НЕЗАРЕГИСТРИРОВАННЫХ (unreg_X)
+                let bestUnregMatchId = null;
+                let minUnregDistance = SIMILARITY_THRESHOLD_FOR_UNREGISTERED_MATCH; // 0.52
                 for (const [unregId, unregData] of unregisteredFaces.entries()) {
                     for (const storedDesc of unregData.descriptors) {
                         const dist = faceapi.euclideanDistance(currentDescriptor, storedDesc);
-                        if (dist < minUnregDistance) { minUnregDistance = dist; bestUnregMatchId = unregId; }
+                        if (dist < minUnregDistance) {
+                            minUnregDistance = dist;
+                            bestUnregMatchId = unregId;
+                        }
                     }
                 }
                 if (bestUnregMatchId) {
-                    currentLabelForFace = bestUnregMatchId; isRecognizedAsUnregistered = true;
+                    currentLabelForFace = bestUnregMatchId;
+                    isRecognizedAsUnregistered = true;
                     client = activeClients.get(currentLabelForFace);
                     const unregData = unregisteredFaces.get(currentLabelForFace);
+                    // ... (остальной код обновления unregData) ...
                     if (unregData) {
                         unregData.lastSeen = now;
                         if (unregData.descriptors.length < MAX_DESCRIPTORS_PER_UNREGISTERED) {
@@ -703,17 +711,47 @@ window.addEventListener('DOMContentLoaded', () => {
                 }
             }
 
-            if (!currentLabelForFace) { sessionCounter++; currentLabelForFace = `unknown_${sessionCounter}`; }
+            // --- [НОВЫЙ БЛОК ДЛЯ RE-ID UNKNOWN] ---
+            // Если лицо все еще не опознано (ни как известное, ни как unreg),
+            // пытаемся найти его среди ТЕКУЩИХ АКТИВНЫХ unknown_X.
+            if (!currentLabelForFace) {
+                let bestActiveUnknownMatchId = null;
+                // Этот порог МОЖЕТ БЫТЬ ЧУТЬ ВЫШЕ (менее строгим), чем для unreg,
+                // т.к. мы сравниваем с последним видимым дескриптором.
+                // ПОДБЕРИТЕ ЭТО ЗНАЧЕНИЕ! Начнем с 0.56
+                let minActiveUnknownDist = 0.56;
 
+                for (const [activeId, activeClient] of activeClients.entries()) {
+                    // Ищем только среди тех, кто еще 'unknown_' и у кого есть дескриптор
+                    if (activeId.startsWith('unknown_') && activeClient.descriptor) {
+                        const dist = faceapi.euclideanDistance(currentDescriptor, activeClient.descriptor);
+                        if (dist < minActiveUnknownDist) {
+                            minActiveUnknownDist = dist;
+                            bestActiveUnknownMatchId = activeId;
+                        }
+                    }
+                }
+
+                // Если нашли совпадение среди активных unknown_X
+                if (bestActiveUnknownMatchId) {
+                    currentLabelForFace = bestActiveUnknownMatchId;
+                    console.log(`[RE-ID UNKNOWN]: Лицо (${currentLabelForFace}) переопознано (Dist: ${minActiveUnknownDist.toFixed(3)})`);
+                    client = activeClients.get(currentLabelForFace);
+                    // Важно: isKnownByMainMatcher и isRecognizedAsUnregistered остаются false.
+                }
+            }
+            // --- [КОНЕЦ НОВОГО БЛОКА] ---
+
+            // Если лицо ВСЕ ЕЩЕ не опознано, ТОЛЬКО ТОГДА создаем новый unknown_X
+            if (!currentLabelForFace) {
+                sessionCounter++;
+                currentLabelForFace = `unknown_${sessionCounter}`;
+            }
+
+            // Если клиента нет в activeClients (т.е. он совсем новый unknown_X)
             if (!activeClients.has(currentLabelForFace)) {
                 client = createClientState(currentLabelForFace, currentDescriptor, d, isKnownByMainMatcher);
-                if (isRecognizedAsUnregistered) {
-                    const unregData = unregisteredFaces.get(currentLabelForFace);
-                    if (unregData) { client.age = unregData.ageEstimate || client.age; client.gender = unregData.genderEstimate || client.gender; const currentBox = d.detection.box; client.isAgeReliable = (d.age && currentBox && (currentBox.width * currentBox.height > MIN_FACE_AREA_FOR_RELIABLE_AGE));}
-                }
-                activeClients.set(currentLabelForFace, client);
-                console.log(`[ПОЯВИЛСЯ]: ${currentLabelForFace} (Известен: ${isKnownByMainMatcher}, Как незарег: ${isRecognizedAsUnregistered})`);
-            } else {
+                // ... (остальной код создания нового клиента) ... else {
                 client = activeClients.get(currentLabelForFace);
             }
 
