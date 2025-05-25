@@ -299,6 +299,28 @@
     border: 2px solid var(--accent-red, #f85149) !important;
     box-shadow: 0 0 10px var(--accent-red, #f85149);
 }
+.overall-stats {
+    background-color: #22272e; /* Чуть другой фон для выделения */
+    padding: 10px 15px;
+    border-radius: 6px;
+    margin-bottom: 15px;
+    border: 1px solid #444c56;
+}
+.overall-stats h3 {
+    margin-top: 0;
+    text-align: center;
+    color: #c9d1d9;
+}
+.overall-stats p {
+    margin: 5px 0;
+    font-size: 0.95em;
+    display: flex;
+    justify-content: space-between;
+}
+.overall-stats p span {
+    font-weight: bold;
+    color: var(--accent-blue, #58a6ff);
+}
     </style>
 </head>
 <body>
@@ -318,6 +340,19 @@
                 </div>
             </div>
         
+    <div class="sidebar_2"> <div class="overall-stats">
+        <h3>Обзор Салона</h3>
+        <p>Активных клиентов: <span id="statActiveClients">0</span></p>
+        <p>🔥 Горячих лидов: <span id="statHotLeads">0</span></p>
+        <p>Популярная зона: <span id="statPopularZone">-</span></p>
+    </div>
+    <hr>
+    <div class="alerts-panel">
+        </div>
+    <hr>
+    
+    <h2>Активные клиенты:</h2>
+    </div>
 
     <div class="sidebar"> <div class="alerts-panel">
         <h2>🔥 Срочные Оповещения / Горячие Клиенты</h2>
