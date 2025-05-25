@@ -7,6 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script> <title>Анализ клиентов - Хакатон</title>
     <style>
         :root {
             --dark-bg: #0D1117;
@@ -321,6 +322,29 @@
     font-weight: bold;
     color: var(--accent-blue, #58a6ff);
 }
+.charts-container {
+    padding: 10px;
+    background-color: #22272e;
+    border-radius: 6px;
+    margin-bottom: 15px;
+    border: 1px solid #444c56;
+}
+.charts-container h3 {
+    text-align: center;
+    margin-top: 0;
+    margin-bottom: 15px;
+    color: #c9d1d9;
+}
+.chart-wrapper {
+    margin-bottom: 20px;
+    padding: 10px;
+    background-color: #2d333b;
+    border-radius: 4px;
+}
+/* Зададим максимальную высоту, чтобы не растягивались сильно */
+#likelihoodChart, #testDriveChart {
+    max-height: 250px !important; /* Важно, чтобы Chart.js правильно масштабировал */
+}
     </style>
 </head>
 <body>
@@ -339,6 +363,28 @@
                 <div id="recentVisitsContent">
                 </div>
             </div>
+
+<div class="sidebar">
+    <div class="overall-stats">
+        </div>
+    <hr>
+
+    <div class="charts-container">
+        <h3>Аналитика по Активным Клиентам</h3>
+        <div class="chart-wrapper">
+            <canvas id="likelihoodChart"></canvas>
+        </div>
+        <div class="chart-wrapper">
+            <canvas id="testDriveChart"></canvas>
+        </div>
+    </div>
+    <hr>
+    <div class="alerts-panel">
+        </div>
+    <hr>
+    
+    <h2>Активные клиенты:</h2>
+    </div>
         
     <div class="sidebar_2"> <div class="overall-stats">
         <h3>Обзор Салона</h3>
