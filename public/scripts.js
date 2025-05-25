@@ -220,85 +220,108 @@ window.addEventListener('DOMContentLoaded', () => {
 
     // --- Функция анализа вероятности покупки (из v6.0) ---
     function analyzePurchaseLikelihood(client, allCurrentlyActiveClients) {
-        let likelihood = 'не определена';
+        let score = 50; // Начальный балл
+        let reasons = []; // Будем собирать причины изменения счета
         let preferredBudget = 'любой';
-        let reason = [];
+        let testDriveInterest = "Нет";
 
         const age = (client.age !== '?') ? parseInt(client.age) : null;
         const gender = client.gender;
+        const timeSpentMs = client.isKnown ? client.timeSpent : (Date.now() - client.entryTime); // Если ушел - берем timeSpent, если нет - текущее время
+        const timeSpentMin = timeSpentMs / 60000; // Время в минутах
+
+        const managerZoneName = interestZones['Manager_Desk']?.name || 'Стойка менеджера';
+        const negotiationZoneName = interestZones['Negotiation_Table']?.name || 'Стол переговоров';
+        const managerTimeSec = (client.viewedModels.get(managerZoneName) || 0) / 1000;
+        const negotiationTimeSec = (client.viewedModels.get(negotiationZoneName) || 0) / 1000;
+
+        let carViewCount = 0;
+        let viewedBudget = false;
+        let viewedPremium = false;
+        let viewedMid = false;
+
+        client.viewedModels.forEach((timeMs, modelNameKey) => {
+            let isCar = false; let budgetCat = null;
+            for (const key in interestZones) {
+                if (interestZones[key].name === modelNameKey.replace('_INTEREST', '')) {
+                     if (interestZones[key].budgetCategory) { // Считаем только авто-зоны
+                         isCar = true; budgetCat = interestZones[key].budgetCategory; break;
+                     }
+                }
+            }
+            if (isCar && (timeMs / 1000) > 15) { // Интерес > 15 сек
+                carViewCount++;
+                if (budgetCat === 'budget') viewedBudget = true;
+                if (budgetCat === 'premium') viewedPremium = true;
+                if (budgetCat === 'mid-range') viewedMid = true;
+            }
+        });
+
+        // 1. Демография и Группы
+        let isAccompanied = false;
+        if (allCurrentlyActiveClients && allCurrentlyActiveClients.size > 1) {
+            for (const [otherId, otherClient] of allCurrentlyActiveClients.entries()) {
+                if (otherId !== client.id && Math.abs(client.entryTime - otherClient.entryTime) < 20000) {
+                    isAccompanied = true; break;
+                }
+            }
+        }
 
         if (gender === 'male' && age !== null) {
             if (age >= 18 && age <= 25) {
-                let accompanied = false;
-                if (allCurrentlyActiveClients && allCurrentlyActiveClients.size > 1) {
-                    for (const [otherId, otherClient] of allCurrentlyActiveClients.entries()) {
-                        if (otherId === client.id || !otherClient.entryTime) continue;
-                        if (Math.abs(client.entryTime - otherClient.entryTime) < 20000) { // 20 сек разница во входе
-                            accompanied = true;
-                            reason.push("Пришел не один (предположительно).");
-                            break;
-                        }
-                    }
-                }
-                if (accompanied) {
-                    likelihood = 'высокий'; preferredBudget = 'budget';
-                    reason.push("Возраст 18-25(М), с кем-то.");
-                } else {
-                    likelihood = 'очень низкий'; reason.push("Возраст 18-25(М), один.");
-                }
-            } else if (age > 25 && age <= 35) {
-                likelihood = 'средний'; reason.push("Возраст 25-35(М).");
-            } else if (age > 35 && age <= 45) {
-                likelihood = 'высокий'; reason.push("Возраст 35-45(М).");
-            } else {
-                likelihood = 'средний (вне фокус-группы)'; reason.push("Мужчина, возраст вне основных фокус-групп.");
-            }
+                if (isAccompanied) { score += 10; reasons.push("М 18-25 (с кем-то)"); preferredBudget = 'budget'; }
+                else { score -= 15; reasons.push("М 18-25 (один)"); }
+            } else if (age > 25 && age <= 35) { score += 5; reasons.push("М 25-35"); }
+            else if (age > 35 && age <= 45) { score += 15; reasons.push("М 35-45"); }
+            else { reasons.push("М (др. возраст)"); }
         } else if (gender === 'female' && age !== null) {
-            if (age >= 28 && age <= 45) {
-                likelihood = 'средний'; reason.push("Возраст 28-45(Ж).");
-            } else {
-                likelihood = 'низкий (вне фокус-группы)'; reason.push("Женщина, возраст вне фокус-группы.");
-            }
-        } else {
-            reason.push("Пол/возраст не определены точно для профилирования.");
+            if (age >= 28 && age <= 45) { score += 5; reasons.push("Ж 28-45"); }
+            else { reasons.push("Ж (др. возраст)"); }
+        } else { reasons.push("Пол/возраст ?"); }
+
+        // 2. Время
+        const timeScore = Math.min(Math.floor(timeSpentMin / 5), 10);
+        score += timeScore;
+        if(timeScore > 0) reasons.push(`Время (${timeScore})`);
+
+        // 3. Авто
+        if (carViewCount === 1) { score += 5; }
+        else if (carViewCount >= 2 && carViewCount <= 3) { score += 10; }
+        else if (carViewCount > 3) { score += 15; }
+        if (carViewCount > 0) reasons.push(`Авто:${carViewCount}`);
+
+        // 4. Бюджетный интерес
+        if (preferredBudget === 'budget' && viewedBudget) {
+            score += 10; reasons.push("Целевой бюджет");
         }
 
-        const negotiationZoneName = interestZones['Negotiation_Table']?.name || 'Стол переговоров';
-        const negotiationTimeSec = (client.viewedModels.get(negotiationZoneName) || 0) / 1000;
+        // 5. Столы
+        if (negotiationTimeSec > 45) { score += 10; reasons.push("Переговоры"); }
+        if (managerTimeSec > 30) { score += 20; reasons.push("Менеджер"); }
 
-        if (negotiationTimeSec > 45) {
-            const highLikelihoods = ['высокий', 'очень высокий'];
-            const mediumLikelihoods = ['средний', 'средний (вне фокус-группы)', 'средний (Ж)'];
-            if (highLikelihoods.includes(likelihood) || mediumLikelihoods.includes(likelihood)) {
-                likelihood = 'очень высокий'; reason.push("Длительное время у стола переговоров.");
-            } else {
-                likelihood = 'средний'; reason.push("Проявил интерес к переговорам, повышая шанс.");
-            }
+        // 6. Связка Авто -> Менеджер
+        if (managerTimeSec > 30 && carViewCount > 0) {
+            score += 15;
+            reasons.push("Тест-драйв?");
+            testDriveInterest = "Высокий";
+        } else if (managerTimeSec > 0 && carViewCount > 0) {
+             testDriveInterest = "Средний";
         }
 
-        if (likelihood === 'высокий' && preferredBudget === 'budget') {
-            let showedInterestInBudgetModels = false;
-            client.viewedModels.forEach((time, modelNameKey) => {
-                let modelBudgetCategory = null;
-                for(const zoneKey in interestZones){
-                    if(interestZones[zoneKey].name === modelNameKey){
-                        modelBudgetCategory = interestZones[zoneKey].budgetCategory; break;
-                    }
-                }
-                if (modelBudgetCategory === 'budget' && (time / 1000) > 15) {
-                    showedInterestInBudgetModels = true;
-                }
-            });
-            if (showedInterestInBudgetModels) { reason.push("Подтвержден интерес к бюджетным моделям."); }
-            else { reason.push("Интерес к бюджетным моделям не зафиксирован, но группа риска покупки бюджетных авто.");}
-        }
-        return { likelihood, preferredBudget, reason: reason.join(' ') };
-    }
+        // Нормализация 0-100
+        score = Math.max(5, Math.min(99, score)); // Держим в рамках 5-99%
 
+        return {
+            likelihood: `${score.toFixed(0)}%`,
+            preferredBudget: preferredBudget,
+            reason: reasons.join('; '),
+            testDriveInterest: testDriveInterest
+        };
+    }   
 
     // --- Функция анализа (основная) (из v6.0) ---
     function generateVisitSummary(client) {
-        if (!client) return { details: "Нет данных о клиенте.", goal: "Не определена", recommendations: [], testDriveInterest: 'Нет' };
+        if (!client) return { details: "Нет данных о клиенте.", goal: "Не определена", recommendations: [], testDriveInterest: 'Нет', purchaseLikelihood: '0%' };
 
         const age = client.age;
         const gender = client.gender === 'male' ? 'М' : (client.gender === 'female' ? 'Ж' : '?');
@@ -313,9 +336,6 @@ window.addEventListener('DOMContentLoaded', () => {
         const managerTimeSec = (interactions.get(managerZoneName) || 0) / 1000;
 
         const significantCarsViewed = new Map();
-        let mostViewedCar = null;
-        let maxCarTime = 0;
-
         interactions.forEach((timeMs, modelNameKey) => {
             let modelName = modelNameKey.replace('_INTEREST', '');
             let isCarZoneName = false;
@@ -324,131 +344,93 @@ window.addEventListener('DOMContentLoaded', () => {
                     isCarZoneName = true; break;
                 }
             }
-            if (isCarZoneName) {
-                const timeSec = timeMs / 1000;
-                if (timeSec > 15) { // Порог интереса к авто = 15 сек
-                    significantCarsViewed.set(modelName, timeSec);
-                    if (timeSec > maxCarTime) { maxCarTime = timeSec; mostViewedCar = modelName; }
-                }
+            if (isCarZoneName && (timeMs / 1000) > 15) {
+                significantCarsViewed.set(modelName, timeMs / 1000);
             }
         });
 
-        let inferredGoal = "Не определена";
-        let testDriveInterest = "Нет";
         let nameToDisplay = client.id;
         if (client.isKnown) { nameToDisplay = clientDataMap.get(client.id)?.name || client.id; }
         else if (client.id.startsWith('unreg_')) { nameToDisplay = `Клиент ${client.id.split('_')[1]} (не зарег.)`; }
         else if (client.id.startsWith('unknown_')) { nameToDisplay = `Клиент ${client.id.split('_')[1]}`; }
-        let details = `Клиент '${nameToDisplay}' (${gender}, ~${age}${client.age !== '?' && !client.isAgeReliable ? " (оценка)" : ""}) провел(а) ${timeSpent.toFixed(0)}с. `;
-        let recommendations = []; // Пока оставим пустым
 
-        if (managerTimeSec > 25 && significantCarsViewed.size > 0) {
-            inferredGoal = "Обсуждение у менеджера (Тест-Драйв?)";
-            testDriveInterest = "Высокий";
-            details += `Обсуждал(а) у менеджера (${managerTimeSec.toFixed(0)}с) после интереса к ${[...significantCarsViewed.keys()].join(', ')}.`;
-            recommendations.push({ modelName: mostViewedCar, reason: "Наибольший интерес + визит к менеджеру." });
-        } else if (negotiationTimeSec > 30 && significantCarsViewed.size > 0) {
-            inferredGoal = "Обсуждение покупки / Консультация";
-            testDriveInterest = "Средний";
-            details += `Высокий интерес к: ${[...significantCarsViewed.keys()].join(', ')}. Провел(а) у стола: ${negotiationTimeSec.toFixed(0)}с.`;
-        } else if (significantCarsViewed.size > 0) {
-            inferredGoal = "Активное изучение моделей";
-            testDriveInterest = "Низкий";
-            details += `Высокий интерес к: ${[...significantCarsViewed.keys()].join(', ')}. Не подходил(а) к столам.`;
-        } else if (managerTimeSec > 25) {
-             inferredGoal = "Общий вопрос у менеджера";
-             testDriveInterest = "Нет";
-             details += `Был(а) у менеджера (${managerTimeSec.toFixed(0)}с), но без интереса к авто.`;
-        } else if (negotiationTimeSec > 30) {
-            inferredGoal = "Сервис / Финансы / Другой вопрос";
-            testDriveInterest = "Нет";
-            details += `Был(а) у стола ${negotiationTimeSec.toFixed(0)}с, но без интереса к авто.`;
-        } else {
-             let hasAnyCarInteraction = false;
-             interactions.forEach((time, modelName) => {
-                 let isCarZoneName = false;
-                 for(const key in interestZones){ if(interestZones[key].name === modelName && key !== negotiationZoneKey && key !== managerZoneKey){ isCarZoneName = true; break; } }
-                 if (isCarZoneName && !modelName.endsWith('_INTEREST')) hasAnyCarInteraction = true;
-             });
-             if (hasAnyCarInteraction) { inferredGoal = "Первичный осмотр / Сравнение"; details += `Кратко осмотрел(а) некоторые модели.`; }
-             else { inferredGoal = "Ожидание / Случайный визит"; details += `Не проявил(а) интереса к зонам.`; }
-        }
+        // <<< ВЫЗЫВАЕМ НОВУЮ АНАЛИТИКУ >>>
+        const purchaseAnalysis = analyzePurchaseLikelihood(client, activeClients);
 
-        // Добавляем рекомендации в details
-        if (recommendations.length > 0) {
-            details += " Рекомендации: ";
-            recommendations.forEach((rec, index) => { details += `${index + 1}) ${rec.modelName} (${rec.reason}) `; });
-        }
+        let inferredGoal = "Не определена"; // Можно улучшить эту логику на основе purchaseAnalysis.reason
+        if (purchaseAnalysis.testDriveInterest === "Высокий") inferredGoal = "Тест-Драйв / Покупка";
+        else if (significantCarsViewed.size > 0) inferredGoal = "Изучение моделей";
+        else if (managerTimeSec > 25 || negotiationTimeSec > 30) inferredGoal = "Консультация / Сервис";
+        else inferredGoal = "Осмотр / Случайный визит";
+
+        let details = `Клиент '${nameToDisplay}' (${gender}, ~${age}) ${timeSpent.toFixed(0)}с. `;
+        if (significantCarsViewed.size > 0) details += `Интерес: ${[...significantCarsViewed.keys()].join(', ')}. `;
+        details += `Менеджер: ${managerTimeSec.toFixed(0)}с. Переговоры: ${negotiationTimeSec.toFixed(0)}с.`;
+        details += ` Факторы: [${purchaseAnalysis.reason}]`; // Добавляем причины
 
         return {
             details: details,
             goal: inferredGoal,
-            recommendations: recommendations,
-            testDriveInterest: testDriveInterest // <<< ВОЗВРАЩАЕМ ИНТЕРЕС
+            recommendations: [], // Пока пусто
+            testDriveInterest: purchaseAnalysis.testDriveInterest,
+            purchaseLikelihood: purchaseAnalysis.likelihood // Берем % из анализа
         };
     }
 
     // --- Функция отправки данных (из v6.0) ---
     async function sendClientDataToServer(client) {
         if (!client) return;
-        const viewed = {}; const significantInterest = {};
-        const negotiationZoneKey = 'Negotiation_Table';
-        const negotiationZoneName = interestZones[negotiationZoneKey]?.name || 'Стол переговоров';
-        const managerZoneKey = 'Manager_Desk';
-        const managerZoneName = interestZones[managerZoneKey]?.name || 'Стойка менеджера';
 
-        const negotiationTime = (client.viewedModels.get(negotiationZoneName) || 0) / 1000;
-        const managerTime = (client.viewedModels.get(managerZoneName) || 0) / 1000;
+        // <<< ВЫЗЫВАЕМ НОВУЮ АНАЛИТИКУ >>>
+        const analysis = analyzePurchaseLikelihood(client, activeClients);
+        const { details, goal, recommendations } = generateVisitSummary(client); // Используем summary для деталей
 
+        const viewed = {};
         client.viewedModels.forEach((time, model) => {
             if (!model.endsWith('_INTEREST')) {
-                const timeSeconds = time / 1000;
-                viewed[model] = timeSeconds.toFixed(1) + 'c';
-                if (timeSeconds > 15 && model !== negotiationZoneName && model !== managerZoneName) {
-                    significantInterest[model] = timeSeconds.toFixed(1) + 'c';
-                }
+                viewed[model] = (time / 1000).toFixed(1) + 'c';
             }
         });
 
-        // Получаем полный анализ, включая тест-драйв
-        const { details, goal, recommendations, testDriveInterest } = generateVisitSummary(client);
-        const purchaseAnalysis = analyzePurchaseLikelihood(client, activeClients);
-
         const dataToSend = {
-            id: client.id, known: client.isKnown, age: client.age, isAgeReliable: client.isAgeReliable, gender: client.gender,
-            entryTime: new Date(client.entryTime).toLocaleString('ru-RU'), exitTime: new Date().toLocaleString('ru-RU'),
-            timeSpentSeconds: (client.timeSpent / 1000).toFixed(0), allViewedModels: viewed,
-            significantInterest: significantInterest, negotiationTimeSeconds: negotiationTime.toFixed(0),
-            managerTimeSeconds: managerTime.toFixed(0), // <<< ДОБАВИЛИ ВРЕМЯ У МЕНЕДЖЕРА
-            inferredGoal: goal, summaryDetails: details, recommendations: recommendations,
-            purchaseLikelihood: purchaseAnalysis.likelihood,
-            preferredBudgetCategory: purchaseAnalysis.preferredBudget,
-            likelihoodReason: purchaseAnalysis.reason,
-            testDriveInterest: testDriveInterest // <<< ДОБАВИЛИ ИНТЕРЕС К ТЕСТ-ДРАЙВУ
+            id: client.id, known: client.isKnown, age: client.age, gender: client.gender,
+            entryTime: new Date(client.entryTime).toLocaleString('ru-RU'),
+            exitTime: new Date().toLocaleString('ru-RU'),
+            timeSpentSeconds: (client.timeSpent / 1000).toFixed(0),
+            viewedModels: viewed,
+            inferredGoal: goal,
+            summaryDetails: details,
+            purchaseLikelihood: analysis.likelihood, // Используем %
+            testDriveInterest: analysis.testDriveInterest,
+            likelihoodReason: analysis.reason
         };
         console.log("ОТПРАВКА ДАННЫХ:", dataToSend);
 
-        let nameForDisplay = client.id;
-        if (client.isKnown) { nameForDisplay = clientDataMap.get(client.id)?.name || client.id; }
-        else if (client.id.startsWith('unreg_')) { nameForDisplay = `Клиент ${client.id.split('_')[1]} (не зарег.)`; }
-        else if (client.id.startsWith('unknown_')) { nameForDisplay = `Клиент ${client.id.split('_')[1] || '?'}`; }
+        // Обновляем сводку для дашборда
+        let nameForDisplay = client.id.startsWith('unreg_') ? `Клиент ${client.id.split('_')[1]}` : client.id;
+        if(client.isKnown) nameForDisplay = clientDataMap.get(client.id)?.name || client.id;
 
         const summaryForDisplay = {
             name: nameForDisplay, details: details, goal: goal,
-            purchaseLikelihood: purchaseAnalysis.likelihood,
-            likelihoodReason: purchaseAnalysis.reason,
-            testDriveInterest: testDriveInterest, // <<< ДОБАВИЛИ В СВОДКУ
+            purchaseLikelihood: analysis.likelihood,
+            testDriveInterest: analysis.testDriveInterest,
             timestamp: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
         };
         recentVisitSummaries.unshift(summaryForDisplay);
         if (recentVisitSummaries.length > MAX_SUMMARIES) { recentVisitSummaries.pop(); }
 
         try {
-            const response = await fetch('/api/save-visit', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify(dataToSend) });
-            if (response.ok) { console.log("УСПЕХ: Данные отправлены на сервер!"); } else { console.error("ОШИБКА ОТПРАВКИ:", response.status, await response.text()); }
-        } catch (error) { console.error("СЕТЕВАЯ ОШИБКА:", error); }
-    }
-    // --- Функция для панели (из v6.0) ---
+            // <<< МЕНЯЕМ URL НА ЛОКАЛЬНЫЙ СЕРВЕР >>>
+            const response = await fetch('http://localhost:3000/api/save-visit', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                body: JSON.stringify(dataToSend)
+            });
+            if (response.ok) { console.log("УСПЕХ: Данные отправлены на Node.js сервер!"); }
+            else { console.error("ОШИБКА ОТПРАВКИ на Node.js:", response.status, await response.text()); }
+        } catch (error) { console.error("СЕТЕВАЯ ОШИБКА (Node.js):", error); }
+    }    // --- Функция для панели (из v6.0) ---
+
     function updateDashboard() {
         if (!dashboardContent) return;
         if (!activeClients || activeClients.size === 0) { dashboardContent.innerHTML = '<p>Ожидание клиентов...</p>'; }
@@ -534,25 +516,38 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 
     // [ИНТЕГРАЦИЯ] Обработчик сохранения с захватом фото и отправкой
+    // --- [ПОЛНАЯ ВЕРСИЯ ОБРАБОТЧИКА КНОПКИ СОХРАНЕНИЯ] ---
     if(saveRegFormButton) saveRegFormButton.addEventListener('click', async () => {
         const idToSave = formLinkedClientId; // Получаем ID клиента, для которого открыта форма
         const clientName = clientNameInput.value.trim();
 
-        if (!idToSave) { alert("Ошибка: Неизвестно, для какого клиента сохранять данные."); return; }
-        if (!clientName) { alert("Введите имя клиента."); return; }
+        if (!idToSave) {
+            alert("Ошибка: Неизвестно, для какого клиента сохранять данные. Попробуйте закрыть и снова открыть форму.");
+            return;
+        }
+        if (!clientName) {
+            alert("Введите имя клиента.");
+            return;
+        }
 
         const activeClient = activeClients.get(idToSave);
-        if (!activeClient || !activeClient.box) { alert("Не удалось найти активного клиента или его рамку для фото. Клиент в кадре?"); return; }
+        if (!activeClient || !activeClient.box) {
+            alert("Не удалось найти активного клиента или его рамку для фото. Убедитесь, что клиент в кадре и попробуйте снова.");
+            return;
+        }
 
         const imageDataUrl = captureFaceImage(activeClient.box);
-        if (!imageDataUrl) { alert("Не удалось захватить фото. Убедитесь, что лицо клиента четко видно."); return; }
+        if (!imageDataUrl) {
+            alert("Не удалось захватить фото. Убедитесь, что лицо клиента четко видно.");
+            return;
+        }
 
-        // [ИНТЕГРАЦИЯ] Проверка лица на снимке (опционально, но полезно)
+        // Проверка лица на сделанном снимке
         try {
             const img = await faceapi.fetchImage(imageDataUrl);
             const detectionOnSnapshot = await faceapi.detectSingleFace(img).withFaceDescriptor();
             if (!detectionOnSnapshot) {
-                alert("На сделанном фото не удалось обнаружить лицо. Пожалуйста, попробуйте еще раз.");
+                alert("На сделанном фото не удалось обнаружить лицо. Пожалуйста, попробуйте еще раз, возможно, с другого ракурса.");
                 return;
             }
             console.log("Фото для сохранения успешно проверено.");
@@ -572,24 +567,25 @@ window.addEventListener('DOMContentLoaded', () => {
             age: clientAgeInput.value,
             gender: clientGenderInput.value,
             phoneNumber: clientPhoneInput.value.trim(),
-            clientIdOriginal: idToSave, // Сохраняем временный ID
+            clientIdOriginal: idToSave, // Сохраняем временный ID (unknown/unreg)
             visitSchedule: [{
                 visitId: `V-${Date.now()}`,
                 entryTime: visitTimeInput.value,
                 exitTime: null,
                 purpose: clientPurposeInput.value
             }],
-            image: imageDataUrl // Добавляем фото!
+            image: imageDataUrl // Добавляем фото в base64!
         };
 
-        console.log("Попытка отправки данных нового клиента на бэкенд:", dataToSend.label);
-        statusText.innerText = `Сохранение ${dataToSend.label}...`;
+        console.log("Попытка отправки РЕГИСТРАЦИИ на бэкенд:", dataToSend.label);
+        if(statusText) statusText.innerText = `Сохранение ${dataToSend.label}...`;
 
         try {
-            const response = await fetch(BACKEND_SAVE_URL, {
+            // Отправляем на Node.js сервер
+            const response = await fetch('http://localhost:3000/api/register-client', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(dataToSend) // Отправляем все данные, включая 'image'
+                body: JSON.stringify(dataToSend)
             });
 
             if (!response.ok) {
@@ -612,7 +608,7 @@ window.addEventListener('DOMContentLoaded', () => {
             activeClients.delete(idToSave); // Удаляем старый ID
             activeClients.set(newLabelForMatcher, activeClient); // Добавляем с новым ID
 
-            // Удаляем из незарегистрированных, если был
+            // Удаляем из незарегистрированных, если был там
             if (unregisteredFaces.has(idToSave)) {
                 unregisteredFaces.delete(idToSave);
             }
@@ -621,14 +617,15 @@ window.addEventListener('DOMContentLoaded', () => {
 
         } catch (error) {
             console.error('Ошибка сохранения клиента:', error);
-            alert(`Ошибка сохранения: ${error.message}`);
-            statusText.innerText = "Ошибка сохранения!";
+            alert(`Ошибка сохранения: ${error.message}. Убедитесь, что Node.js сервер запущен.`);
+            if(statusText) statusText.innerText = "Ошибка сохранения!";
         }
     });
 
+    // Убедитесь, что обработчик кнопки закрытия тоже есть
     if(closeRegFormButton) closeRegFormButton.addEventListener('click', hideRegistrationForm);
-
     // --- Функции для досье (из v6.0) ---
+    
     function showDossier(clientInfo) {
         if (!clientInfo || isFormOpen || isDossierOpen) return;
         console.log(`ВЫЗОВ: showDossier() для ${clientInfo.label || clientInfo.name}`);
