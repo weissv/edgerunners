@@ -1,1204 +1,423 @@
-window.addEventListener('DOMContentLoaded', () => {
-
-    console.log("DOM готов. Запускаем скрипт v6.1 Merged (Хакатон)...");
-
-    // --- Элементы DOM ---
-    const videoContainer = document.getElementById("videoContainer");
-    const statusText = document.getElementById("statusText");
-    const registrationForm = document.getElementById("registrationForm");
-    const clientIdInput = document.getElementById("clientId");
-    const visitTimeInput = document.getElementById("visitTime");
-    const clientNameInput = document.getElementById("clientName");
-    const clientAgeInput = document.getElementById("clientAge");
-    const clientGenderInput = document.getElementById("clientGender");
-    const clientPhoneInput = document.getElementById("clientPhone");
-    const clientPurposeInput = document.getElementById("clientPurpose");
-    const saveRegFormButton = document.getElementById("saveRegFormButton");
-    const closeRegFormButton = document.getElementById("closeRegFormButton");
-    const dossierDisplayPanel = document.getElementById("dossierDisplayPanel");
-    const dossierId = document.getElementById("dossierId");
-    const dossierName = document.getElementById("dossierName");
-    const dossierAge = document.getElementById("dossierAge");
-    const dossierGender = document.getElementById("dossierGender");
-    const dossierPhone = document.getElementById("dossierPhone");
-    const dossierClientIdDisplay = document.getElementById("dossierClientIdDisplay");
-    const dossierVisitHistory = document.getElementById("dossierVisitHistory");
-    const closeDossierButton = document.getElementById("closeDossierButton");
-    const dashboardContent = document.getElementById("dashboardContent");
-    const recentVisitsTitle = document.getElementById("recentVisitsTitle");
-    const recentVisitsContent = document.getElementById("recentVisitsContent");
-    const AUTO_SAVE_SNAPSHOT_TIMEOUT = 15000; // 15 секунд для авто-сохранения снимка (10-20 сек по вашему запросу)
-
-    // Проверка элементов
-    const allElements = { videoContainer, statusText, registrationForm, clientIdInput, visitTimeInput, clientNameInput, clientAgeInput, clientGenderInput, clientPhoneInput, clientPurposeInput, saveRegFormButton, closeRegFormButton, dossierDisplayPanel, dossierId, dossierName, dossierAge, dossierGender, dossierPhone, dossierClientIdDisplay, dossierVisitHistory, closeDossierButton, dashboardContent, recentVisitsTitle, recentVisitsContent };
-    let allDomElementsFound = true;
-    for (const key in allElements) {
-        if (!allElements[key]) {
-            console.error(`CRITICAL ERROR: DOM Element with ID '${key}' not found! Check index.html.`);
-            allDomElementsFound = false;
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Face Recognition System - Remix Dossier</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script> <title>Анализ клиентов - Хакатон</title>
+    <style>
+        :root {
+            --bg-color: #0a0f14; /* Еще темнее, почти черный для "глубины" */
+            --surface-color: #161b22; /* Основной фон для элементов интерфейса */
+            --card-bg: #1f242c; /* Фон для индивидуальных карточек, чуть светлее */
+            --border-color: #30363d;
+            --text-primary: #e6edf3; /* Яркий белый для основного текста */
+            --text-secondary: #7d8590; /* Приглушенный для второстепенного */
+            --accent-blue: #388bfd; /* Более яркий синий */
+            --accent-green: #2da44e;
+            --accent-yellow: #d29922;
+            --accent-red: #e5534b;
+            --accent-purple: #a371f7;
+            --font-main: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            --font-mono: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace; /* Для ID и "технических" данных */
         }
-    }
-    if (allDomElementsFound) {
-        console.log("Все ключевые элементы DOM успешно найдены.");
-    } else {
-        alert("Критическая ошибка: Не все элементы DOM найдены. Проверьте index.html и консоль разработчика (F12).");
-        return;
-    }
-
-    const video = document.createElement("video");
-    video.autoplay = true; video.muted = true; video.width = 720; video.height = 560;
-    if (videoContainer) {
-        videoContainer.appendChild(video);
-    } else {
-        console.error("videoContainer не найден, видео не может быть добавлено.");
-        return;
-    }
-
-    let canvas;
-    let clientDataMap = new Map();
-    let labels = [];
-    let faceMatcher = null;
-    let detectionInterval = null;
-    // ... другие глобальные переменные ...
-    let likelihoodChartInstance = null;
-    let testDriveChartInstance = null;
-
-    // --- ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ДЛЯ ЛОГИКИ ---
-    let activeClients = new Map();
-    const INACTIVITY_TIMEOUT = 10000;
-    const ZONE_THRESHOLD = 3000;
-    let sessionCounter = 0;
-    let isFormOpen = false;
-    let isDossierOpen = false;
-    let formLinkedClientId = null; // ID клиента, для которого открыта форма
-
-
-    const interestZones = {
-        'Model_S': { x1: 50, y1: 100, x2: 250, y2: 400, name: 'Седан "Элегант"', budgetCategory: 'premium' },
-        'Model_X': { x1: 450, y1: 100, x2: 670, y2: 400, name: 'Внедорожник "Простор"', budgetCategory: 'mid-range' },
-        'Model_3': { x1: 260, y1: 300, x2: 440, y2: 500, name: 'Спорткар "Скорость"', budgetCategory: 'budget' },
-        'Negotiation_Table': { x1: 300, y1: 10, x2: 420, y2: 80, name: 'Стол переговоров', budgetCategory: null },
-        'Manager_Desk': { x1: 600, y1: 10, x2: 710, y2: 80, name: 'Стойка менеджера', budgetCategory: null } // <<< ДОБАВЛЕНО (Координаты ваши!)
-    };
-    const REGISTRATION_DELAY = 5000; // Задержка перед показом формы
-
-    // --- Переменные для сглаживания возраста ---
-    const MIN_FACE_AREA_FOR_RELIABLE_AGE = 12000;
-    const AGE_READINGS_BUFFER_SIZE = 15;
-
-    // --- Переменные для последних визитов на дашборде ---
-    let recentVisitSummaries = [];
-    const MAX_SUMMARIES = 3;
-
-    // --- Переменные для незарегистрированных ---
-    let unregisteredFaces = new Map();
-    let unregIdCounter = 0;
-    const MAX_DESCRIPTORS_PER_UNREGISTERED = 3;
-    const SIMILARITY_THRESHOLD_FOR_UNREGISTERED_MATCH = 0.52;
-    const MIN_TIME_TO_SAVE_UNKNOWN_AS_UNREG = 6000;
-    const MIN_FACE_AREA_TO_SAVE_AS_UNREG = 10000;
-    const MIN_DISTANCE_FOR_NEW_UNREG_DESCRIPTOR = 0.3;
-    const MIN_QUALITY_DESCRIPTORS_TO_SAVE_UNREG = 1;
-    const MAX_TEMP_DESCRIPTORS_FOR_UNKNOWN = 5;
-
-    // [ИНТЕГРАЦИЯ] URL бэкенда для сохранения (из старого кода)
-    const BACKEND_SAVE_URL = '/api/save-client-with-image'; // Замените на ваш реальный URL
-
-    if (typeof faceapi === 'undefined') {
-        console.error("КРИТИЧЕСКАЯ ОШИБКА: Библиотека face-api.min.js не загружена!");
-        if(statusText) statusText.innerText = "ОШИБКА: face-api.js не найден!";
-        return;
-    }
-
-    // --- Вспомогательные функции ---
-    function generateClientId() { return `C-${Date.now().toString().slice(-6)}`; } // [ИНТЕГРАЦИЯ] Чуть изменил формат
-
-    function calculateMedian(arr) {
-        if (!arr || arr.length === 0) return null;
-        const sorted = arr.slice().sort((a, b) => a - b);
-        const mid = Math.floor(sorted.length / 2);
-        const median = sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
-        return Math.round(median);
-    }
-
-    function getRepresentativeDescriptor(descriptors) {
-        if (!descriptors || descriptors.length === 0) return null;
-        if (descriptors.length === 1) return descriptors[0];
-        let bestIndex = 0; let minAvgDistance = Infinity;
-        for (let i = 0; i < descriptors.length; i++) {
-            let currentSumDistances = 0;
-            for (let j = 0; j < descriptors.length; j++) {
-                if (i === j) continue;
-                currentSumDistances += faceapi.euclideanDistance(descriptors[i], descriptors[j]);
+    
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+    
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            font-family: var(--font-main);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            min-height: 100vh;
+            font-size: 15px; /* Базовый размер шрифта чуть меньше для "плотности" */
+            /* Убрал точки, можно вернуть если нужно:
+            background-image: radial-gradient(circle at 1px 1px, rgba(200, 200, 200, 0.03) 1px, transparent 0);
+            background-size: 28px 28px; */
+        }
+    
+        .page-title { /* Новый класс для главного заголовка страницы */
+            font-size: 1.8em;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            color: var(--text-primary);
+            margin-bottom: 30px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid var(--border-color);
+            width: 100%;
+            max-width: 1200px;
+            text-align: center;
+        }
+    
+        h2 { font-size: 1.25em; font-weight: 500; margin-bottom: 15px; color: var(--text-primary); }
+        h3 { font-size: 1.05em; font-weight: 500; margin-bottom: 12px; color: var(--text-secondary); }
+    
+        hr {
+            border: none;
+            height: 1px;
+            background-color: var(--border-color);
+            margin: 20px 0;
+        }
+    
+        /* --- Основной контейнер --- */
+        .main-container {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: flex-start;
+            gap: 25px; /* Чуть больше отступ */
+            width: 100%;
+            max-width: 1200px; /* Увеличил немного */
+        }
+    
+        #videoContainer {
+            flex: 3; /* Даем видео чуть больше приоритета */
+            min-width: 320px;
+            max-width: 720px; /* Оставим ограничение, чтобы не растягивалось */
+            aspect-ratio: 720 / 560;
+            border: 1px solid var(--border-color);
+            border-radius: 8px; /* Менее круглые углы */
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            background-color: #000;
+            overflow: hidden;
+            position: relative;
+        }
+    
+        #videoContainer video,
+        #videoContainer canvas {
+            position: absolute; top: 0; left: 0;
+            width: 100%; height: 100%;
+            border-radius: 8px;
+        }
+        #videoContainer canvas { z-index: 10; }
+    
+        /* --- Сайдбар (Панель дашборда) --- */
+        #dashboardPanel {
+            flex: 2; /* Сайдбар занимает значительную часть */
+            min-width: 320px;
+            max-width: 400px; /* Чуть шире для информации */
+            background-color: var(--surface-color);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+            height: calc( (100vw - 40px - 25px) * (2/5) * (560/720) ); /* Попытка сохранить пропорцию, если видео не макс. ширины */
+            max-height: 560px; /* Ограничиваем высоту сайдбара высотой видео по умолчанию */
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 18px; /* Отступы между блоками */
+        }
+        #dashboardPanel > h2 { /* Общий заголовок сайдбара */
+            text-align: center;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 0; /* Убираем отступ, так как gap есть */
+            font-size: 1.2em;
+            color: var(--text-primary);
+        }
+         #dashboardPanel > hr { margin: 0; } /* Убираем стандартные отступы hr, gap сделает свое дело */
+    
+    
+        /* Блоки внутри сайдбара */
+        .overall-stats, .alerts-panel, .charts-container, #dashboardContentContainer, #recentVisitsContainer {
+            padding: 15px;
+            background-color: var(--card-bg); /* Карточный фон для блоков */
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+        }
+        .overall-stats h3, .alerts-panel h3, .charts-container h3, #dashboardContentContainer > h3, #recentVisitsContainer > h3 {
+            margin-top: 0; margin-bottom: 12px;
+            font-size: 1em; color: var(--text-primary); /* Заголовки блоков чуть ярче */
+            font-weight: 500; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;
+        }
+    
+        .overall-stats p { display: flex; justify-content: space-between; font-size: 0.9em; color: var(--text-secondary); margin-bottom: 6px; }
+        .overall-stats p span { font-weight: 600; color: var(--accent-blue); }
+    
+        .alerts-panel h3 { color: var(--accent-red); }
+        #alertsList { list-style-type: none; max-height: 120px; overflow-y: auto; font-size: 0.85em; }
+        #alertsList li {
+            background-color: var(--surface-bg); /* Чуть темнее для элементов списка */
+            padding: 8px 10px; margin-bottom: 6px; border-radius: 4px;
+            border-left: 3px solid var(--accent-yellow); color: var(--text-primary);
+        }
+        #alertsList li.high-priority { border-left-color: var(--accent-red); font-weight: 600; }
+    
+        .chart-wrapper { margin-bottom: 10px; }
+        #likelihoodChart, #testDriveChart { max-height: 180px !important; } /* Уменьшил высоту чартов */
+    
+        #dashboardContent { /* Контейнер для карточек активных клиентов */
+            display: flex; flex-direction: column; gap: 10px;
+        }
+    
+        .client-card {
+            background-color: var(--surface-bg); /* Тот же фон что и у блоков */
+            border: 1px solid var(--border-color);
+            border-left: 3px solid var(--accent-blue); /* Акцентная линия слева */
+            border-radius: 4px; /* Менее круглые */
+            padding: 10px 12px;
+            font-size: 0.9em;
+            transition: box-shadow 0.2s ease, border-color 0.2s ease;
+        }
+        .client-card:hover { border-color: var(--accent-blue); }
+        .client-card.alert-active { border-left-color: var(--accent-red) !important; border-color: var(--accent-red); }
+        .client-card h3 {
+            margin-top: 0; margin-bottom: 8px; font-size: 1.05em;
+            color: var(--text-primary); font-weight: 600;
+        }
+        .client-card p { margin: 3px 0; color: var(--text-secondary); font-size: 0.9em; display: flex; justify-content: space-between; }
+        .client-card p span { color: var(--text-primary); font-weight: 400; text-align: right; }
+        .client-card p strong span { font-weight: 600; /* Для выделения вероятности и т.д. */ }
+        .client-card ul { list-style: none; padding-left: 0; margin-top: 6px; }
+        .client-card li {
+            background-color: var(--dark-bg);
+            padding: 4px 8px; border-radius: 3px; margin-bottom: 3px;
+            font-size: 0.85em; color: var(--text-secondary);
+        }
+    
+        #recentVisitsContent .visit-summary-card {
+            background-color: var(--surface-bg);
+            border: 1px solid var(--border-color);
+            border-left: 3px solid var(--accent-purple); /* Другой акцент для истории */
+            border-radius: 4px; padding: 10px 12px; margin-bottom: 8px;
+            font-size: 0.85em;
+        }
+        .visit-summary-card .client-name { font-size: 1em; font-weight: 600; color: var(--text-primary); }
+        /* ... остальные стили для visit-summary-card можно адаптировать по аналогии с client-card ... */
+    
+    
+        /* --- Всплывающие панели (Форма, Досье) --- */
+        .info-panel { /* Стили как в вашем примере, но можно проверить размеры и отступы */
+            position: fixed; top: 50%; left: 50%;
+            transform: translate(-50%, -50%) scale(0.95);
+            background-color: var(--card-bg); /* Используем card-bg, а не surface-bg для модалок */
+            padding: 25px 30px; border-radius: 8px; /* Меньше радиус */
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+            z-index: 1000; width: 90%; max-width: 450px; /* Чуть шире */
+            display: none; border: 1px solid var(--border-color);
+            opacity: 0; transition: opacity 0.2s ease-out, transform 0.2s ease-out;
+        }
+        .info-panel.active { display: block; opacity: 1; transform: translate(-50%, -50%) scale(1); }
+        /* ... остальные стили для info-panel h2, label, input, button-group ... */
+        .info-panel button { font-size: 0.95em; padding: 9px 18px; }
+    
+        /* Статус текст внизу */
+        #statusText {
+            position: fixed; bottom: 15px; left: 50%; transform: translateX(-50%);
+            color: var(--text-secondary); font-size: 0.8em; background-color: rgba(22, 27, 34, 0.9);
+            padding: 6px 12px; border-radius: 4px; z-index: 150;
+            border: 1px solid var(--border-color); backdrop-filter: blur(3px);
+        }
+    
+        /* Скроллбар */
+        #dashboardPanel::-webkit-scrollbar { width: 6px; }
+        #dashboardPanel::-webkit-scrollbar-track { background: var(--surface-color); border-radius: 10px; }
+        #dashboardPanel::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 10px; }
+        #dashboardPanel::-webkit-scrollbar-thumb:hover { background: #55595e; }
+    
+    
+        /* === Мобильная Адаптация === */
+        @media (max-width: 1024px) { /* Более ранний переход на вертикаль, если сайдбар широкий */
+            .main-container {
+                flex-direction: column;
+                align-items: center;
             }
-            const avgDistance = currentSumDistances / (descriptors.length - 1);
-            if (avgDistance < minAvgDistance) { minAvgDistance = avgDistance; bestIndex = i; }
-        }
-        return descriptors[bestIndex];
-    }
-
-    // [ИНТЕГРАЦИЯ] Функция захвата фото из старого кода
-    function captureFaceImage(detectionBox) {
-        if (!detectionBox || !canvas || !video.videoWidth || !video.videoHeight) {
-            console.warn("captureFaceImage: не могу захватить фото - нет detectionBox, canvas или видео не готово.");
-            return null;
-        }
-        const temp = document.createElement('canvas');
-        const ctx = temp.getContext('2d');
-        const { x, y, width, height } = detectionBox;
-        const pad = width * 0.3; // Небольшой отступ
-        const sx = Math.max(0, x - pad);
-        const sy = Math.max(0, y - pad);
-        let sw = width + pad * 2;
-        let sh = height + pad * 2;
-        sw = Math.min(sw, video.videoWidth - sx);
-        sh = Math.min(sh, video.videoHeight - sy);
-
-        if (sw <= 0 || sh <= 0) {
-            console.warn("captureFaceImage: неверные размеры области захвата.");
-            return null;
-        }
-        temp.width = sw;
-        temp.height = sh;
-        ctx.drawImage(video, sx, sy, sw, sh, 0, 0, sw, sh);
-        return temp.toDataURL('image/jpeg', 0.85); // Возвращаем в base64
-    }
-
-    // --- Функции отслеживания (из v6.0) ---
-    function createClientState(label, descriptor, detection, isKnown = false) {
-        const now = Date.now();
-        const initialAge = detection.age ? Math.round(detection.age) : '?';
-        const initialBox = detection.detection?.box;
-        const initialArea = initialBox ? initialBox.width * initialBox.height : 0;
-        return {
-            id: label, descriptor: descriptor, isKnown: isKnown, entryTime: now, lastSeen: now, timeSpent: 0,
-            currentZone: null, zoneEntryTime: null, viewedModels: new Map(),
-            age: initialAge, ageReadings: (detection.age && initialArea > MIN_FACE_AREA_FOR_RELIABLE_AGE) ? [detection.age] : [],
-            isAgeReliable: (detection.age && initialArea > MIN_FACE_AREA_FOR_RELIABLE_AGE),
-            tempQualityDescriptors: [], gender: detection.gender || '?', box: initialBox,
-            emotionsHistory: [], dominantEmotion: 'neutral', registrationTriggered: false,
-            // Данные для "живой" аналитики на карточке
-            livePurchaseLikelihood: 'N/A',
-            liveTestDriveInterest: 'Нет',
-            livePreferredBudget: 'не определен',
-            liveLikelihoodReason: '',
-            alertMessage: null,
-            // <<< НОВОЕ ДЛЯ ПУТИ КЛИЕНТА >>>
-            zonePath: [], // Массив для хранения последовательности зон
-            lastZoneForPathRec: null ,// Последняя записанная в path зона, чтобы избежать дублей подряд
-            zonePath: [],
-            lastZoneForPathRec: null,
-            // <<< НОВОЕ ПОЛЕ >>>
-            autoSavedSnapshot: false
-        };
-    }
-
-    function checkZone(box, zones) {
-        if (!box) return null;
-        const centerX = box.x + box.width / 2; const centerY = box.y + box.height / 2;
-        for (const zoneKey in zones) {
-            const zone = zones[zoneKey];
-            if (centerX >= zone.x1 && centerX <= zone.x2 && centerY >= zone.y1 && centerY <= zone.y2) { return zoneKey; }
-        }
-        return null;
-    }
-
-    // --- Функции отрисовки (из v6.0) ---
-    function drawZones(ctx, zones) {
-        ctx.strokeStyle = 'rgba(255, 255, 0, 0.6)'; ctx.lineWidth = 1; ctx.font = '13px Inter';
-        ctx.fillStyle = 'rgba(255, 255, 0, 0.8)';
-        for (const zoneKey in zones) {
-            const z = zones[zoneKey];
-            ctx.strokeRect(z.x1, z.y1, z.x2 - z.x1, z.y2 - z.y1);
-            ctx.fillText(z.name, z.x1 + 5, z.y1 + 15);
-        }
-    }
-
-    function drawClientInfo(ctx, box, client) {
-        if (!box || !client) return;
-        const lines = [];
-        let nameToDisplay = client.id;
-        if (client.isKnown) { nameToDisplay = clientDataMap.get(client.id)?.name || client.id; }
-        else if (client.id.startsWith('unreg_')) { nameToDisplay = `Клиент ${client.id.split('_')[1]} (не зарег.)`; }
-        else if (client.id.startsWith('unknown_')) { nameToDisplay = `Клиент ${client.id.split('_')[1]}`; }
-
-        const genderMap = { 'male': 'М', 'female': 'Ж', '?': '?' };
-        let ageTextForCanvas = (client.age !== '?') ? `~${client.age}` : '?';
-        if (client.age !== '?' && !client.isAgeReliable) { ageTextForCanvas += " (оц.)"; }
-        lines.push(`${nameToDisplay} (${genderMap[client.gender]}, ${ageTextForCanvas})`);
-        const timeInSalon = ((Date.now() - client.entryTime) / 1000).toFixed(0);
-        lines.push(`Время: ${timeInSalon} сек`);
-        if (client.currentZone && interestZones[client.currentZone]) { lines.push(`Зона: ${interestZones[client.currentZone].name}`); }
-        lines.push(`Эмоция: ${client.dominantEmotion}`);
-        new faceapi.draw.DrawTextField(lines, box.topLeft, {
-            backgroundColor: 'rgba(22, 27, 34, 0.8)', fontColor: '#C9D1D9', fontSize: 13, padding: 6
-        }).draw(ctx);
-    }
-
-    // --- Функция анализа вероятности покупки (из v6.0) ---
-    function analyzePurchaseLikelihood(client, allCurrentlyActiveClients) {
-        let score = 50; // Начальный балл
-        let reasons = [];
-        let preferredBudget = 'не определен'; // <<< ИЗМЕНЕНО
-        let testDriveInterest = "Нет";
-
-        const age = (client.age !== '?') ? parseInt(client.age) : null;
-        const gender = client.gender;
-        const timeSpentMs = client.isKnown ? client.timeSpent : (Date.now() - client.entryTime);
-        const timeSpentMin = timeSpentMs / 60000;
-
-        const managerZoneName = interestZones['Manager_Desk']?.name || 'Стойка менеджера';
-        const negotiationZoneName = interestZones['Negotiation_Table']?.name || 'Стол переговоров';
-        const managerTimeSec = (client.viewedModels.get(managerZoneName) || 0) / 1000;
-        const negotiationTimeSec = (client.viewedModels.get(negotiationZoneName) || 0) / 1000;
-
-        let carViewCount = 0;
-        let viewedCarTypes = { budget: 0, midRange: 0, premium: 0, suv: 0, sedan: 0, sport: 0 }; // <<< НОВОЕ: счетчики по типам
-
-        client.viewedModels.forEach((timeMs, modelNameKey) => {
-            let isCar = false; let budgetCat = null;
-            let carTypeName = modelNameKey.replace('_INTEREST', '').toLowerCase();
-
-            for (const key in interestZones) {
-                if (interestZones[key].name.toLowerCase() === carTypeName) {
-                     if (interestZones[key].budgetCategory) {
-                         isCar = true; budgetCat = interestZones[key].budgetCategory;
-                         break;
-                     }
-                }
+            #videoContainer {
+                width: 100%;
+                max-width: 640px; /* На планшетах может быть не на всю ширину */
+                height: auto;
             }
-            if (isCar && (timeMs / 1000) > 15) { // Интерес > 15 сек
-                carViewCount++;
-                if (budgetCat === 'budget') viewedCarTypes.budget++;
-                if (budgetCat === 'mid-range') viewedCarTypes.midRange++;
-                if (budgetCat === 'premium') viewedCarTypes.premium++;
-
-                // Определяем тип по названию зоны (упрощенно)
-                if (carTypeName.includes('внедорожник') || carTypeName.includes('простор')) viewedCarTypes.suv++;
-                if (carTypeName.includes('седан') || carTypeName.includes('элегант')) viewedCarTypes.sedan++;
-                if (carTypeName.includes('спорткар') || carTypeName.includes('скорость')) viewedCarTypes.sport++;
+            #dashboardPanel {
+                width: 100%;
+                max-width: 640px; /* Той же ширины, что и видео */
+                height: auto; /* По содержимому */
+                min-height: 0;
+                margin-top: 20px;
+                max-height: none; /* Убираем ограничение по высоте от видео */
             }
-        });
-
-        // 1. Демография и Группы
-        let isAccompanied = false;
-        if (allCurrentlyActiveClients && allCurrentlyActiveClients.size > 1) {
-            for (const [otherId, otherClient] of allCurrentlyActiveClients.entries()) {
-                if (otherId !== client.id && Math.abs(client.entryTime - otherClient.entryTime) < 20000) {
-                    isAccompanied = true; break;
-                }
+            .charts-container {
+                display: flex;
+                flex-direction: column; /* Чарты всегда друг под другом на мобильных */
             }
+             #likelihoodChart, #testDriveChart { max-height: 220px !important; }
         }
-
-        if (gender === 'male') {
-            reasons.push("Пол:М");
-            if (age >= 18 && age <= 25) {
-                if (isAccompanied) { score += 10; reasons.push("18-25(с кем-то)"); preferredBudget = 'budget'; }
-                else { score -= 15; reasons.push("18-25(один)"); }
-            } else if (age > 25 && age <= 35) { score += 5; reasons.push("25-35"); preferredBudget = 'mid-range';}
-            else if (age > 35 && age <= 55) { score += 15; reasons.push("35-55"); preferredBudget = 'mid-range/premium';} // <<< ИЗМЕНЕНО
-            else { reasons.push("(др. возраст)"); }
-        } else if (gender === 'female') {
-            reasons.push("Пол:Ж");
-            if (age >= 25 && age <= 35) { score += 5; reasons.push("25-35"); preferredBudget = 'mid-range'; } // <<< НОВОЕ ПРАВИЛО
-            else if (age > 35 && age <= 50) { score += 10; reasons.push("35-50"); preferredBudget = 'mid-range/premium';} // <<< НОВОЕ ПРАВИЛО
-            else { reasons.push("(др. возраст)"); }
-        } else { reasons.push("Пол/возраст ?"); }
-
-        // 2. Время
-        const timeScore = Math.min(Math.floor(timeSpentMin / 5), 12); // +1 за 5 мин, макс 12 (было 10)
-        score += timeScore;
-        if(timeScore > 0) reasons.push(`Время(${timeScore})`);
-
-        // 3. Количество просмотренных авто
-        if (carViewCount === 1) { score += 5; }
-        else if (carViewCount >= 2 && carViewCount <= 3) { score += 10; }
-        else if (carViewCount > 3) { score += 15; }
-        if (carViewCount > 0) reasons.push(`Авто:${carViewCount}`);
-
-        // 4. Соответствие бюджету и типу (основываясь на демографии)
-        if (preferredBudget === 'budget' && viewedCarTypes.budget > 0) { score += 10; reasons.push("Целев.бюджет"); }
-        if (preferredBudget === 'mid-range' && viewedCarTypes.midRange > 0) { score += 5; reasons.push("Целев.средний"); }
-        if (preferredBudget === 'mid-range/premium' && (viewedCarTypes.midRange > 0 || viewedCarTypes.premium > 0)) { score += 10; reasons.push("Целев.класс"); }
-        if (preferredBudget === 'premium' && viewedCarTypes.premium > 0) { score += 15; reasons.push("Целев.премиум"); }
-
-
-        // <<< НОВЫЕ ПРАВИЛА: Демография + Тип авто >>>
-        if (gender === 'male' && age !== null && age > 30 && viewedCarTypes.suv > 0) {
-            score += 10; reasons.push("М+Внедорожник");
-        }
-        if (gender === 'female' && age !== null && age > 30 && (viewedCarTypes.suv > 0 || viewedCarTypes.sedan > 0) ) { // Женщины могут смотреть или SUV или комфортные седаны
-            score += 8; reasons.push("Ж+SUV/Седан");
-        }
-        if (age !== null && age < 30 && viewedCarTypes.sport > 0) {
-            score += 5; reasons.push("Молодой+Спорт");
-        }
-
-
-        // 5. Столы
-        if (negotiationTimeSec > 45) { score += 10; reasons.push("Переговоры"); }
-        if (managerTimeSec > 30) { score += 20; reasons.push("Менеджер"); }
-
-        // 6. Связка Авто -> Менеджер
-        if (managerTimeSec > 30 && carViewCount > 0) {
-            score += 15; // Бонус!
-            reasons.push("Авто->Менеджер");
-            testDriveInterest = "Высокий";
-        } else if (managerTimeSec > 0 && carViewCount > 0) {
-             testDriveInterest = "Средний";
-        } else if (managerTimeSec > 0 && carViewCount === 0) {
-             testDriveInterest = "Низкий (без авто)";
-        }
-
-
-        // Нормализация 0-100
-        score = Math.max(5, Math.min(99, score));
-
-        return {
-            likelihood: `${score.toFixed(0)}%`,
-            preferredBudget: preferredBudget, // Возвращаем предполагаемый бюджет
-            reason: reasons.join('; '),
-            testDriveInterest: testDriveInterest
-        };
-    }
-    // --- Функция анализа (основная) (из v6.0) ---
-    function generateVisitSummary(client) {
-        if (!client) return { details: "Нет данных о клиенте.", goal: "Не определена", recommendations: [], testDriveInterest: 'Нет', purchaseLikelihood: '0%' };
-
-        const age = client.age;
-        const gender = client.gender === 'male' ? 'М' : (client.gender === 'female' ? 'Ж' : '?');
-        const timeSpent = (client.timeSpent / 1000);
-        const interactions = client.viewedModels;
-        const negotiationZoneKey = 'Negotiation_Table';
-        const negotiationZoneName = interestZones[negotiationZoneKey]?.name || 'Стол переговоров';
-        const managerZoneKey = 'Manager_Desk';
-        const managerZoneName = interestZones[managerZoneKey]?.name || 'Стойка менеджера';
-
-        const negotiationTimeSec = (interactions.get(negotiationZoneName) || 0) / 1000;
-        const managerTimeSec = (interactions.get(managerZoneName) || 0) / 1000;
-
-        const significantCarsViewed = new Map();
-        interactions.forEach((timeMs, modelNameKey) => {
-            let modelName = modelNameKey.replace('_INTEREST', '');
-            let isCarZoneName = false;
-            for (const key in interestZones) {
-                if (interestZones[key].name === modelName && key !== negotiationZoneKey && key !== managerZoneKey) {
-                    isCarZoneName = true; break;
-                }
+    
+        @media (max-width: 480px) { /* Совсем маленькие экраны */
+            body { padding: 10px; font-size:14px; }
+            .page-title { font-size: 1.3em; margin-bottom: 20px; }
+            h2 { font-size: 1.15em; }
+            h3 { font-size: 1em; }
+    
+            #dashboardPanel { padding: 15px; }
+            .overall-stats, .alerts-panel, .charts-container, #dashboardContentContainer, #recentVisitsContainer {
+                 padding: 12px;
             }
-            if (isCarZoneName && (timeMs / 1000) > 15) {
-                significantCarsViewed.set(modelName, timeMs / 1000);
-            }
-        });
+            .client-card, #recentVisitsContent .visit-summary-card { padding: 10px; font-size: 0.85em; }
+            .client-card h3 { font-size: 1em; }
+    
+            .info-panel { width: calc(100% - 20px); padding: 20px 15px; }
+            .info-panel h2 { font-size: 1.1em; }
+            .info-panel button { font-size: 0.9em; padding: 8px 15px; }
+    
+            #statusText { font-size: 0.75em; padding: 4px 8px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        <h1>Face Recognition System</h1> <div class="main-container">
+            <div id="videoContainer">
+                </div>
+    
+            <aside id="dashboardPanel">
+                <h2>Активность в Салоне</h2> <div class="overall-stats">
+                    <h3>Обзор Салона</h3>
+                    <p>Активных клиентов: <span id="statActiveClients">0</span></p>
+                    <p>🔥 Горячих лидов: <span id="statHotLeads">0</span></p>
+                    <p>Популярная зона: <span id="statPopularZone">-</span></p>
+                </div>
+                <hr>
+    
+                <div class="alerts-panel">
+                    <h3>🔥 Срочные Оповещения</h3>
+                    <ul id="alertsList">
+                        <li>Нет активных оповещений...</li>
+                    </ul>
+                </div>
+                <hr>
+    
+                <div class="charts-container">
+                    <h3>Аналитика Активных</h3>
+                    <div class="chart-wrapper">
+                        <canvas id="likelihoodChart"></canvas>
+                    </div>
+                    <div class="chart-wrapper">
+                        <canvas id="testDriveChart"></canvas>
+                    </div>
+                </div>
+                <hr>
+    
+                <h3>Активные клиенты</h3>
+                <div id="dashboardContent">
+                    </div>
+                <hr>
+    
+                <h3 id="recentVisitsTitle" style="display:none; margin-top: 20px; font-size: 1.1em; border-top: 1px solid var(--border-color); padding-top: 15px; margin-bottom:10px;">Последние визиты:</h3>
+                <div id="recentVisitsContent">
+                    </div>
+            </aside>
+        </div>
+    
+        <div id="statusText">Инициализация системы...</div>
+    
+        <div id="registrationForm" class="info-panel"> </div>
+        <div id="dossierDisplayPanel" class="info-panel"> </div>
+    </div>
 
-        let nameToDisplay = client.id;
-        if (client.isKnown) { nameToDisplay = clientDataMap.get(client.id)?.name || client.id; }
-        else if (client.id.startsWith('unreg_')) { nameToDisplay = `Клиент ${client.id.split('_')[1]} (не зарег.)`; }
-        else if (client.id.startsWith('unknown_')) { nameToDisplay = `Клиент ${client.id.split('_')[1]}`; }
+<div class="sidebar">
+    <div class="overall-stats">
+        </div>
+    <hr>
 
-        // <<< ВЫЗЫВАЕМ НОВУЮ АНАЛИТИКУ >>>
-        const purchaseAnalysis = analyzePurchaseLikelihood(client, activeClients);
-
-        let inferredGoal = "Не определена"; // Можно улучшить эту логику на основе purchaseAnalysis.reason
-        if (purchaseAnalysis.testDriveInterest === "Высокий") inferredGoal = "Тест-Драйв / Покупка";
-        else if (significantCarsViewed.size > 0) inferredGoal = "Изучение моделей";
-        else if (managerTimeSec > 25 || negotiationTimeSec > 30) inferredGoal = "Консультация / Сервис";
-        else inferredGoal = "Осмотр / Случайный визит";
-
-        let details = `Клиент '${nameToDisplay}' (${gender}, ~${age}) ${timeSpent.toFixed(0)}с. `;
-        if (significantCarsViewed.size > 0) details += `Интерес: ${[...significantCarsViewed.keys()].join(', ')}. `;
-        details += `Менеджер: ${managerTimeSec.toFixed(0)}с. Переговоры: ${negotiationTimeSec.toFixed(0)}с.`;
-        details += ` Факторы: [${purchaseAnalysis.reason}]`; // Добавляем причины
-
-        return {
-            details: details,
-            goal: inferredGoal,
-            recommendations: [], // Пока пусто
-            testDriveInterest: purchaseAnalysis.testDriveInterest,
-            purchaseLikelihood: purchaseAnalysis.likelihood // Берем % из анализа
-        };
-    }
-
-    async function sendSnapshotDataToServer(client) {
-        if (!client) return;
-        console.log(`[SNAPSHOT SEND]: Подготовка снимка для ${client.id}`);
-
-        const now = Date.now();
-        // Получаем текущую "живую" аналитику, которая уже должна быть на объекте client
-        // из processMultipleDetections
-        const analysis = {
-            likelihood: client.livePurchaseLikelihood,
-            testDriveInterest: client.liveTestDriveInterest,
-            preferredBudget: client.livePreferredBudget,
-            reason: client.liveLikelihoodReason
-        };
-
-        const currentTimeSpentSeconds = ((now - client.entryTime) / 1000).toFixed(0);
-
-        const snapshotSummaryDetails = `Снимок клиента '${client.id}' (${client.gender === 'male' ? 'М' : (client.gender === 'female' ? 'Ж':'?')}, ~${client.age}) через ${currentTimeSpentSeconds}с. Зона: ${client.currentZone ? (interestZones[client.currentZone]?.name || 'N/A') : 'N/A'}. Факторы: [${analysis.reason || 'Нет'}]`;
-        const snapshotGoal = `Снимок активности @${currentTimeSpentSeconds}с`;
-
-        const viewed = {};
-        client.viewedModels.forEach((time, model) => {
-            if (!model.endsWith('_INTEREST')) {
-                viewed[model] = (time / 1000).toFixed(1) + 'c';
-            }
-        });
+    <div class="charts-container">
+        <h3>Аналитика по Активным Клиентам</h3>
+        <div class="chart-wrapper">
+            <canvas id="likelihoodChart"></canvas>
+        </div>
+        <div class="chart-wrapper">
+            <canvas id="testDriveChart"></canvas>
+        </div>
+    </div>
+    <hr>
+    <div class="alerts-panel">
+        </div>
+    <hr>
+    
+    <h2>Активные клиенты:</h2>
+    </div>
         
-        const clientPathString = client.zonePath && client.zonePath.length > 0 ? client.zonePath.join(' -> ') : 'Маршрут не записан';
+    <div class="sidebar_2"> <div class="overall-stats">
+        <h3>Обзор Салона</h3>
+        <p>Активных клиентов: <span id="statActiveClients">0</span></p>
+        <p>🔥 Горячих лидов: <span id="statHotLeads">0</span></p>
+        <p>Популярная зона: <span id="statPopularZone">-</span></p>
+    </div>
+    <hr>
+    <div class="alerts-panel">
+        </div>
+    <hr>
+    
+    <h2>Активные клиенты:</h2>
+    </div>
 
-        const dataToSend = {
-            id: client.id, // Будет unknown_X или unreg_X
-            isSnapshot: true, // Флаг, что это снимок
-            known: client.isKnown, // Будет false
-            age: client.age,
-            gender: client.gender,
-            entryTime: new Date(client.entryTime).toLocaleString('ru-RU'),
-            snapshotTime: new Date(now).toLocaleString('ru-RU'),
-            timeSinceEntrySeconds: currentTimeSpentSeconds,
-            viewedModels: viewed,
-            currentZone: client.currentZone ? (interestZones[client.currentZone]?.name || 'N/A') : 'N/A',
-            inferredGoal: snapshotGoal,
-            summaryDetails: snapshotSummaryDetails,
-            purchaseLikelihood: analysis.likelihood,
-            testDriveInterest: analysis.testDriveInterest,
-            preferredBudget: analysis.preferredBudget,
-            likelihoodReason: analysis.reason,
-            path: clientPathString
-        };
-
-        console.log("[SNAPSHOT SEND]: Отправка данных снимка:", dataToSend.id);
-
-        try {
-            const response = await fetch('http://localhost:3000/api/save-visit', { // Отправляем на тот же эндпоинт
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-                body: JSON.stringify(dataToSend)
-            });
-            if (response.ok) {
-                console.log(`[SNAPSHOT SEND]: УСПЕХ! Данные снимка для ${client.id} отправлены!`);
-            } else {
-                console.error(`[SNAPSHOT SEND]: ОШИБКА для ${client.id}:`, response.status, await response.text());
-            }
-        } catch (error) {
-            console.error(`[SNAPSHOT SEND]: СЕТЕВАЯ ОШИБКА для ${client.id}:`, error);
-        }
-    }
-
-
-    // --- Функция отправки данных (из v6.0) ---
-    async function sendClientDataToServer(client) {
-        if (!client) return;
-
-        const analysis = analyzePurchaseLikelihood(client, activeClients);
-        const { details, goal, recommendations } = generateVisitSummary(client);
-
-        const viewed = {};
-        client.viewedModels.forEach((time, model) => {
-            if (!model.endsWith('_INTEREST')) {
-                viewed[model] = (time / 1000).toFixed(1) + 'c';
-            }
-        });
+    <div class="sidebar"> <div class="alerts-panel">
+        <h2>🔥 Срочные Оповещения / Горячие Клиенты</h2>
+            <ul id="alertsList">
+                <li>Нет активных оповещений...</li>
+            </ul>
+        </div>
+        <hr> 
+        <h2>Активные клиенты:</h2>
+        <div id="dashboardContent">
+            </div>
         
-        // Формируем строку пути
-        const clientPathString = client.zonePath && client.zonePath.length > 0 ? client.zonePath.join(' -> ') : 'Нет данных о пути';
+        <hr>
+        
+        <h2 id="recentVisitsTitle" style="display: none;">Последние визиты:</h2>
+        <div id="recentVisitsContent">
+            </div>
+    </div>
 
-        const dataToSend = {
-            id: client.id, known: client.isKnown, age: client.age, gender: client.gender,
-            entryTime: new Date(client.entryTime).toLocaleString('ru-RU'),
-            exitTime: new Date().toLocaleString('ru-RU'),
-            timeSpentSeconds: (client.timeSpent / 1000).toFixed(0),
-            viewedModels: viewed,
-            inferredGoal: goal,
-            summaryDetails: details,
-            purchaseLikelihood: analysis.likelihood,
-            testDriveInterest: analysis.testDriveInterest,
-            preferredBudget: analysis.preferredBudget,
-            likelihoodReason: analysis.reason,
-            path: clientPathString // <<< ДОБАВИЛИ ПУТЬ
-        };
-        console.log("ОТПРАВКА ДАННЫХ:", dataToSend);
 
-        let nameForDisplay = client.id;
-        if (client.isKnown) { nameForDisplay = clientDataMap.get(client.id)?.name || client.id; }
-        else if (client.id.startsWith('unreg_')) { nameForDisplay = `Клиент ${client.id.split('_')[1]} (не зарег.)`; }
-        else if (client.id.startsWith('unknown_')) { nameToDisplay = `Клиент ${client.id.split('_')[1] || '?'}`; }
 
-        const summaryForDisplay = {
-            name: nameForDisplay, details: details, goal: goal,
-            purchaseLikelihood: analysis.likelihood,
-            likelihoodReason: analysis.reason,
-            testDriveInterest: analysis.testDriveInterest,
-            preferredBudget: analysis.preferredBudget,
-            path: clientPathString, // <<< ДОБАВИЛИ ПУТЬ В СВОДКУ
-            timestamp: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
-        };
-        recentVisitSummaries.unshift(summaryForDisplay);
-        if (recentVisitSummaries.length > MAX_SUMMARIES) { recentVisitSummaries.pop(); }
 
-        try {
-            const response = await fetch('http://localhost:3000/api/save-visit', { /* ... */ });
-            if (response.ok) { console.log("УСПЕХ: Данные отправлены на Node.js сервер!"); }
-            else { console.error("ОШИБКА ОТПРАВКИ на Node.js:", response.status, await response.text()); }
-        } catch (error) { console.error("СЕТЕВАЯ ОШИБКА (Node.js):", error); }
-    }
-    function updateDashboard() {
-        const alertsListElement = document.getElementById("alertsList");
-        let currentAlertsHTML = '';
 
-        // Общая статистика
-        const statActiveClientsEl = document.getElementById('statActiveClients');
-        const statHotLeadsEl = document.getElementById('statHotLeads');
-        const statPopularZoneEl = document.getElementById('statPopularZone');
 
-        let likelihoodCounts = { low: 0, medium: 0, high: 0 };
-        let testDriveCounts = { high: 0, medium: 0, lowOrNone: 0 };
-        let hotLeadsCount = 0;
-        let zoneCounts = {};
 
-        if (statActiveClientsEl) statActiveClientsEl.textContent = activeClients.size;
 
-        activeClients.forEach(client => {
-            // Считаем для общей статистики и диаграмм
-            if (client.alertMessage) hotLeadsCount++;
-            if (client.currentZone && interestZones[client.currentZone]) {
-                const zoneName = interestZones[client.currentZone].name;
-                zoneCounts[zoneName] = (zoneCounts[zoneName] || 0) + 1;
-            }
 
-            if (client.livePurchaseLikelihood) {
-                const likelihoodNum = parseInt(client.livePurchaseLikelihood);
-                if (likelihoodNum >= 75) likelihoodCounts.high++;
-                else if (likelihoodNum >= 50) likelihoodCounts.medium++;
-                else likelihoodCounts.low++;
-            } else {
-                likelihoodCounts.low++; // Если нет данных, считаем низкой
-            }
 
-            if (client.liveTestDriveInterest === 'Высокий') testDriveCounts.high++;
-            else if (client.liveTestDriveInterest === 'Средний') testDriveCounts.medium++;
-            else testDriveCounts.lowOrNone++;
-        });
+    <div id="statusText">Инициализация системы...</div>
 
-        if (statHotLeadsEl) statHotLeadsEl.textContent = hotLeadsCount;
-        let maxCount = 0; let popularZone = '-';
-        for (const zoneName in zoneCounts) {
-            if (zoneCounts[zoneName] > maxCount) { maxCount = zoneCounts[zoneName]; popularZone = zoneName; }
-        }
-        if (statPopularZoneEl) statPopularZoneEl.textContent = popularZone + (maxCount > 0 ? ` (${maxCount})` : '');
+    <div id="registrationForm" class="info-panel">
+        <h2>Новый Клиент</h2>
+        <label for="clientId">ID Клиента:</label> <input type="text" id="clientId" name="clientId" readonly>
+        <label for="visitTime">Время визита:</label> <input type="text" id="visitTime" name="visitTime" readonly>
+        <label for="clientName">Имя:</label> <input type="text" id="clientName" name="clientName" required>
+        <label for="clientAge">Возраст:</label> <input type="number" id="clientAge" name="clientAge" required>
+        <label for="clientGender">Пол:</label> <select id="clientGender" name="clientGender"> <option value="male">Мужской</option> <option value="female">Женский</option> <option value="unknown">Не определен</option> </select>
+        <label for="clientPhone">Номер телефона:</label> <input type="tel" id="clientPhone" name="clientPhone">
+        <label for="clientPurpose">Цель визита:</label> <input type="text" id="clientPurpose" name="clientPurpose" required>
+        <div class="button-group">
+            <button type="button" class="close" id="closeRegFormButton">Закрыть</button>
+            <button type="button" class="save" id="saveRegFormButton">Сохранить (Симуляция)</button>
+        </div>
+    </div>
 
-        // Обновление диаграмм
-        if (likelihoodChartInstance) {
-            likelihoodChartInstance.data.datasets[0].data = [likelihoodCounts.low, likelihoodCounts.medium, likelihoodCounts.high];
-            likelihoodChartInstance.update();
-        }
-        if (testDriveChartInstance) {
-            testDriveChartInstance.data.datasets[0].data = [testDriveCounts.high, testDriveCounts.medium, testDriveCounts.lowOrNone];
-            testDriveChartInstance.update();
-        }
+    <div id="dossierDisplayPanel" class="info-panel">
+        <h2>Досье Клиента</h2>
+        <div class="dossier-field"> <label class="dossier-label">ID:</label> <span id="dossierId" class="dossier-value">-</span> </div>
+        <div class="dossier-field"> <label class="dossier-label">Имя:</label> <span id="dossierName" class="dossier-value">-</span> </div>
+        <div class="dossier-field"> <label class="dossier-label">Возраст:</label> <span id="dossierAge" class="dossier-value">-</span> </div>
+        <div class="dossier-field"> <label class="dossier-label">Пол:</label> <span id="dossierGender" class="dossier-value">-</span> </div>
+        <div class="dossier-field"> <label class="dossier-label">Телефон:</label> <span id="dossierPhone" class="dossier-value">-</span> </div>
+        <div class="dossier-field"> <label class="dossier-label">Client ID:</label> <span id="dossierClientIdDisplay" class="dossier-value">-</span> </div>
+        <div class="dossier-field"> <label class="dossier-label">История визитов:</label> <ul id="dossierVisitHistory"><li>-</li></ul> </div>
+        <div class="button-group">
+            <button type="button" class="close" id="closeDossierButton">Закрыть</button>
+        </div>
+    </div>
 
-        // Обновление активных клиентов (карточки)
-        if (!dashboardContent) return;
-        if (!activeClients || activeClients.size === 0) {
-            dashboardContent.innerHTML = '<p>Ожидание клиентов...</p>';
-            if (alertsListElement) alertsListElement.innerHTML = '<li>Нет активных оповещений...</li>';
-        } else {
-            let clientCardsHTML = ''; const now = Date.now();
-            activeClients.forEach(client => {
-                let nameToDisplay;
-                const genderMap = { 'male': 'М', 'female': 'Ж', '?': '' };
-                const genderSuffix = client.gender !== '?' ? ` (${genderMap[client.gender]})` : '';
-
-                if (client.isKnown) {
-                    nameToDisplay = clientDataMap.get(client.id)?.name || client.id;
-                } else if (client.id.startsWith('unreg_')) {
-                    nameToDisplay = `Клиент ${client.id.split('_')[1]}${genderSuffix}`;
-                } else if (client.id.startsWith('unknown_')) {
-                    if (client.gender && client.gender !== '?') {
-                        nameToDisplay = `${client.gender === 'male' ? 'Мужчина' : 'Женщина'} ${client.id.split('_')[1]}`;
-                    } else {
-                        nameToDisplay = `Клиент ${client.id.split('_')[1]}`;
-                    }
-                } else {
-                    nameToDisplay = client.id;
-                }
-
-                const timeInSeconds = ((now - client.entryTime) / 1000).toFixed(0);
-                let ageDisplay = (client.age !== '?') ? `~${client.age}` : '?';
-                if (client.age !== '?' && !client.isAgeReliable) { ageDisplay += " (оценка)"; }
-                let currentZoneName = client.currentZone && interestZones[client.currentZone] ? interestZones[client.currentZone].name : '-';
-
-                let cardLikelihoodColor = 'inherit';
-                if (client.livePurchaseLikelihood) {
-                    const likelihoodNum = parseInt(client.livePurchaseLikelihood);
-                    if (likelihoodNum >= 75) cardLikelihoodColor = 'var(--accent-green)';
-                    else if (likelihoodNum >= 50) cardLikelihoodColor = 'var(--accent-yellow)';
-                    else if (likelihoodNum < 30) cardLikelihoodColor = 'var(--accent-red)';
-                }
-                let cardTestDriveColor = 'inherit';
-                if (client.liveTestDriveInterest === 'Высокий') cardTestDriveColor = 'var(--accent-green)';
-                else if (client.liveTestDriveInterest === 'Средний') cardTestDriveColor = 'var(--accent-yellow)';
-
-                const cardAlertClass = client.alertMessage ? 'alert-active' : '';
-
-                clientCardsHTML += `<div class="client-card ${cardAlertClass}"><h3>${nameToDisplay}</h3>`;
-                clientCardsHTML += `<p>Статус: <span>${client.isKnown ? 'Известен' : (client.id.startsWith('unreg_') ? 'Виден ранее' : 'Новый')}</span></p>`;
-                clientCardsHTML += `<p>Пол/Возраст: <span>${genderMap[client.gender]} / ${ageDisplay}</span></p>`;
-                clientCardsHTML += `<p>Время в салоне: <span>${timeInSeconds} сек</span></p>`;
-                clientCardsHTML += `<p>Эмоция: <span>${client.dominantEmotion}</span></p>`;
-                clientCardsHTML += `<p>В зоне: <span style="font-weight: bold; color: ${currentZoneName === 'Стойка менеджера' ? 'var(--accent-green)' : 'inherit'};">${currentZoneName}</span></p>`;
-
-                if (client.livePurchaseLikelihood) {
-                    clientCardsHTML += `<p style="margin-top: 8px;"><strong>Вероятность покупки: <span style="color: ${cardLikelihoodColor}; font-size: 1.1em;">${client.livePurchaseLikelihood}</span></strong></p>`;
-                }
-                if (client.liveTestDriveInterest && client.liveTestDriveInterest !== "Нет") {
-                    clientCardsHTML += `<p><strong>Тест-драйв: <span style="color: ${cardTestDriveColor};">${client.liveTestDriveInterest}</span></strong></p>`;
-                }
-                if (client.livePreferredBudget && client.livePreferredBudget !== "не определен") {
-                    clientCardsHTML += `<p><small>Предп. бюджет: ${client.livePreferredBudget}</small></p>`;
-                }
-                
-                const viewedModelsList = [...client.viewedModels.keys()].filter(k => !k.endsWith('_INTEREST') && k !== (interestZones['Manager_Desk']?.name || 'Стойка менеджера') && k !== (interestZones['Negotiation_Table']?.name || 'Стол переговоров'));
-                if (viewedModelsList.length > 0) {
-                    clientCardsHTML += `<p style="margin-top: 5px;">Интерес к моделям:</p><ul>`;
-                    viewedModelsList.forEach(modelName => { const time = (client.viewedModels.get(modelName) / 1000).toFixed(0); clientCardsHTML += `<li>${modelName} (${time}с)</li>`; });
-                    clientCardsHTML += `</ul>`;
-                }
-                clientCardsHTML += `</div>`;
-
-                if (client.alertMessage) {
-                    let priorityClass = (parseInt(client.livePurchaseLikelihood) >= 75 || client.liveTestDriveInterest === 'Высокий') ? 'high-priority' : '';
-                    currentAlertsHTML += `<li class="${priorityClass}">${nameToDisplay}: ${client.alertMessage}</li>`;
-                }
-            });
-            dashboardContent.innerHTML = clientCardsHTML;
-            if (alertsListElement) {
-                alertsListElement.innerHTML = currentAlertsHTML || '<li>Нет активных оповещений...</li>';
-            }
-        }
-
-        // Обновление "Последних визитов"
-        if (recentVisitsContent && recentVisitsTitle) {
-             if (recentVisitSummaries.length > 0) {
-                recentVisitsTitle.style.display = 'block'; let summaryHtml = '';
-                recentVisitSummaries.forEach(visit => {
-                    let summaryTestDriveColor = 'inherit';
-                    if (visit.testDriveInterest === 'Высокий') summaryTestDriveColor = 'var(--accent-green)';
-                    else if (visit.testDriveInterest === 'Средний') summaryTestDriveColor = 'var(--accent-yellow)';
-
-                    let summaryLikelihoodColor = 'inherit';
-                    const summaryLikelihoodNum = parseInt(visit.purchaseLikelihood);
-                    if (summaryLikelihoodNum >= 75) summaryLikelihoodColor = 'var(--accent-green)';
-                    else if (summaryLikelihoodNum >= 50) summaryLikelihoodColor = 'var(--accent-yellow)';
-                    else if (summaryLikelihoodNum < 30) summaryLikelihoodColor = 'var(--accent-red)';
-
-                    summaryHtml +=
-                    `<div class="visit-summary-card">
-                        <p class="client-name">${visit.name} <span class="timestamp">(${visit.timestamp})</span></p>
-                        <p><small><strong>Детали:</strong> ${visit.details || 'N/A'}</small></p>
-                        <p><strong>Цель:</strong> ${visit.goal || 'N/A'}</p>
-                        <p><strong>Вероятность покупки:</strong> <span style="color: ${summaryLikelihoodColor}; font-weight: bold;">${visit.purchaseLikelihood || 'N/A'}</span></p>
-                        <p><strong>Интерес к Тест-Драйву:</strong> <span style="color: ${summaryTestDriveColor};">${visit.testDriveInterest || 'N/A'}</span></p>
-                        <p><small><strong>Предпочт. бюджет:</strong> ${visit.preferredBudget || 'N/A'}</small></p>
-                        <p><small><strong>Маршрут:</strong> ${visit.path || 'N/A'}</small></p>
-                        <p><small><strong>Факторы оценки:</strong> ${visit.likelihoodReason || 'N/A'}</small></p>
-                        </div>`;
-                });
-                recentVisitsContent.innerHTML = summaryHtml;
-            } else { recentVisitsTitle.style.display = 'none'; recentVisitsContent.innerHTML = ''; }
-        }
-    }    // Убедитесь, что обработчик кнопки закрытия тоже есть
-    if(closeRegFormButton) closeRegFormButton.addEventListener('click', hideRegistrationForm);
-    // --- Функции для досье (из v6.0) ---
-
-    function showDossier(clientInfo) {
-        if (!clientInfo || isFormOpen || isDossierOpen) return;
-        console.log(`ВЫЗОВ: showDossier() для ${clientInfo.label || clientInfo.name}`);
-        isDossierOpen = true;
-        if(dossierId) dossierId.textContent = clientInfo.id || '-';
-        if(dossierName) dossierName.textContent = clientInfo.name || '-';
-        if(dossierAge) dossierAge.textContent = clientInfo.age || '-';
-        if(dossierGender) dossierGender.textContent = clientInfo.gender === 'male' ? 'Мужской' : (clientInfo.gender === 'female' ? 'Женский' : 'Не указан');
-        if(dossierPhone) dossierPhone.textContent = clientInfo.phoneNumber || '-';
-        if(dossierClientIdDisplay) dossierClientIdDisplay.textContent = clientInfo.clientIdOriginal || clientInfo.clientId || clientInfo.label || '-';
-        if(dossierVisitHistory){
-            if (clientInfo.visitSchedule && clientInfo.visitSchedule.length > 0) {
-                dossierVisitHistory.innerHTML = clientInfo.visitSchedule.map(v => `<li>${v.purpose} <span>${v.entryTime}</span></li>`).join('');
-            } else {
-                dossierVisitHistory.innerHTML = '<li>Нет данных о визитах</li>';
-            }
-        }
-        if(dossierDisplayPanel) dossierDisplayPanel.style.display = 'block';
-    }
-
-    function hideDossier() {
-        console.log("ВЫЗОВ: hideDossier()");
-        if(dossierDisplayPanel) dossierDisplayPanel.style.display = 'none';
-        isDossierOpen = false;
-    }
-    if(closeDossierButton) closeDossierButton.addEventListener('click', hideDossier);
-
-    // --- Функции загрузки данных ---
-    async function loadClientData() {
-        console.log("Начинаю загрузку clients.json...");
-        try {
-            // [ИНТЕГРАЦИЯ] Добавлен cacheBust для принудительной перезагрузки
-            const response = await fetch('./clients.json?cacheBust=' + new Date().getTime());
-            if (!response.ok) throw new Error(`HTTP error! status: ${response.status} for clients.json`);
-            const clients = await response.json();
-            clientDataMap.clear(); labels = []; // [ИНТЕГРАЦИЯ] Очистка перед загрузкой
-            clients.forEach(client => {
-                clientDataMap.set(client.label, client);
-                labels.push(client.label);
-            });
-            console.log("УСПЕХ: Данные клиентов загружены. Всего меток:", labels.length);
-        } catch (error) {
-            console.error("ОШИБКА загрузки clients.json:", error);
-            if(statusText) statusText.innerText = "Ошибка: Не удалось загрузить базу клиентов.";
-        }
-    }
-
-    async function loadLabeledImagesAndMatcher(labelsToLoad) {
-        if (!labelsToLoad || labelsToLoad.length === 0) { console.warn("Нет меток для загрузки. FaceMatcher не будет создан."); return null; }
-        console.log("ЗАГРУЗКА ЭТАЛОННЫХ ЛИЦ для:", labelsToLoad);
-        if(statusText) statusText.innerText = "Загрузка эталонных лиц...";
-        const labeledFaceDescriptors = await Promise.all(
-            labelsToLoad.map(async (label) => {
-                const descriptors = [];
-                console.log(`-- Загрузка для ${label} --`);
-                for (let i = 1; i <= 2; i++) { // Пытаемся загрузить до 2х фото
-                    let img = null;
-                    for (const ext of ['jpg', 'png', 'jpeg']) {
-                         // [ИНТЕГРАЦИЯ] Добавлен cacheBust для принудительной перезагрузки
-                        const path = `./labeled_faces/${label}/${i}.${ext}?cacheBust=${new Date().getTime()}`;
-                        try {
-                            img = await faceapi.fetchImage(path);
-                            console.log(`    УСПЕХ: ${path} загружен.`);
-                            break;
-                        } catch (e) { /* Игнорируем ошибки загрузки, т.к. может быть другое расширение или нет второго фото */ }
-                    }
-                    if (img) {
-                        try {
-                            const detectionResult = await faceapi.detectSingleFace(img).withFaceLandmarks().withFaceDescriptor();
-                            if (detectionResult) {
-                                descriptors.push(detectionResult.descriptor);
-                                console.log(`        => Лицо найдено и дескриптор добавлен.`);
-                            } else {
-                                console.warn(`        => Лицо НЕ найдено на ${label}/${i}.`);
-                            }
-                        } catch (detectError) {
-                            console.error(`        => ОШИБКА обнаружения на ${label}/${i}:`, detectError);
-                        }
-                    } else {
-                         // [ИНТЕГРАЦИЯ] Убрали ошибку, если второе фото не найдено
-                         if (i === 1) console.error(`    ОШИБКА: Не удалось загрузить ОСНОВНОЕ ФОТО ${label}/${i}.(jpg/png/jpeg).`);
-                    }
-                }
-                if (descriptors.length > 0) {
-                    console.log(`    => УСПЕХ для ${label}: ${descriptors.length} дескриптор(а) создано.`);
-                    return new faceapi.LabeledFaceDescriptors(label, descriptors);
-                } else {
-                    console.error(`    => ОШИБКА для ${label}: Не удалось создать ни одного дескриптора.`);
-                    return null;
-                }
-            })
-        );
-        const validDescriptors = labeledFaceDescriptors.filter(d => d !== null);
-        console.log(`ИТОГО: Загружено валидных дескрипторов: ${validDescriptors.length} из ${labelsToLoad.length}`);
-        if (validDescriptors.length === 0) {
-            console.error("КРИТИЧЕСКАЯ ОШИБКА: НИ ОДНОГО дескриптора.");
-            if(statusText) statusText.innerText = "Ошибка: Не удалось загрузить эталонные лица.";
-            return null;
-        }
-        console.log("Face Matcher УСПЕШНО создан.");
-        return new faceapi.FaceMatcher(validDescriptors, 0.62); // Порог 0.62 как в v6.0
-    }
-
-    // --- ГЛАВНАЯ ЛОГИКА ОБРАБОТКИ КАДРА (из v6.0, с мелкими правками) ---
-    async function processMultipleDetections(detections, displaySize, canvas) {
-        const now = Date.now();
-        const seenLabelsThisFrame = new Set();
-        const ctx = canvas.getContext("2d");
-
-        for (const d of detections) {
-            if (!d.descriptor || !d.detection || !d.detection.box) continue;
-
-            let client = null;
-            let currentLabelForFace = null;
-            let isKnownByMainMatcher = false;
-            let isRecognizedAsUnregistered = false;
-            const currentDescriptor = d.descriptor;
-
-            const bestMatch = faceMatcher ? faceMatcher.findBestMatch(currentDescriptor) : { label: 'unknown', distance: Infinity };
-
-            // 1. Проверка известных лиц
-            if (bestMatch.label !== 'unknown') {
-                currentLabelForFace = bestMatch.label;
-                isKnownByMainMatcher = true;
-            } else {
-                // 2. Проверка незарегистрированных (unreg_X)
-                let bestUnregMatchId = null;
-                let minUnregDistance = SIMILARITY_THRESHOLD_FOR_UNREGISTERED_MATCH; // (0.52 по умолчанию, можно пробовать 0.53-0.54)
-
-                for (const [unregId, unregData] of unregisteredFaces.entries()) {
-                    for (const storedDesc of unregData.descriptors) {
-                        const dist = faceapi.euclideanDistance(currentDescriptor, storedDesc);
-                        if (dist < minUnregDistance) {
-                            minUnregDistance = dist; bestUnregMatchId = unregId;
-                        }
-                    }
-                }
-
-                if (bestUnregMatchId) {
-                    currentLabelForFace = bestUnregMatchId;
-                    isRecognizedAsUnregistered = true;
-                    const unregData = unregisteredFaces.get(currentLabelForFace);
-                    if (unregData) {
-                        unregData.lastSeen = now;
-                        if (unregData.descriptors.length < MAX_DESCRIPTORS_PER_UNREGISTERED) {
-                            let isFarEnough = !unregData.descriptors.some(desc => faceapi.euclideanDistance(currentDescriptor, desc) < MIN_DISTANCE_FOR_NEW_UNREG_DESCRIPTOR);
-                            if (isFarEnough) {
-                                unregData.descriptors.push(currentDescriptor);
-                                console.log(`[UNREG UPDATE]: Добавлен ${unregData.descriptors.length}-й дескриптор для ${currentLabelForFace}.`);
-                            }
-                        }
-                    }
-                }
-            }
-
-            // 3. Проверка активных неизвестных (unknown_X)
-            if (!currentLabelForFace) {
-                let bestActiveUnknownMatchId = null;
-                let minActiveUnknownDist = 0.58; // (Порог для Re-ID unknown, пробуйте 0.58-0.60)
-
-                for (const [activeId, activeClientObj] of activeClients.entries()) {
-                    if (activeId.startsWith('unknown_')) {
-                        let descriptorToMatchAgainst = activeClientObj.descriptor;
-                        if (activeClientObj.tempQualityDescriptors && activeClientObj.tempQualityDescriptors.length > 0) {
-                            const repDesc = getRepresentativeDescriptor(activeClientObj.tempQualityDescriptors);
-                            if (repDesc) {
-                                descriptorToMatchAgainst = repDesc;
-                            }
-                        }
-                        if (descriptorToMatchAgainst) {
-                            const dist = faceapi.euclideanDistance(currentDescriptor, descriptorToMatchAgainst);
-                            // console.log(`      -> Re-ID Check with ${activeId} (using ${descriptorToMatchAgainst === activeClientObj.descriptor ? 'last' : 'rep.'} desc), Dist: ${dist.toFixed(3)}`);
-                            if (dist < minActiveUnknownDist) {
-                                minActiveUnknownDist = dist; bestActiveUnknownMatchId = activeId;
-                            }
-                        }
-                    }
-                }
-                if (bestActiveUnknownMatchId) {
-                    currentLabelForFace = bestActiveUnknownMatchId;
-                    console.log(`[RE-ID UNKNOWN]: Лицо (${currentLabelForFace}) переопознано (Dist: ${minActiveUnknownDist.toFixed(3)})`);
-                }
-            }
-
-            // 4. Если все еще не опознан - создаем НОВЫЙ unknown_X
-            if (!currentLabelForFace) {
-                sessionCounter++;
-                currentLabelForFace = `unknown_${sessionCounter}`;
-            }
-
-            // 5. Получаем или Создаем состояние клиента
-            if (!activeClients.has(currentLabelForFace)) {
-                client = createClientState(currentLabelForFace, currentDescriptor, d, isKnownByMainMatcher);
-                if(isRecognizedAsUnregistered) {
-                    const unregData = unregisteredFaces.get(currentLabelForFace);
-                    if (unregData) { client.age = unregData.ageEstimate || client.age; client.gender = unregData.genderEstimate || client.gender; }
-                }
-                activeClients.set(currentLabelForFace, client);
-                console.log(`[ПОЯВИЛСЯ]: ${currentLabelForFace} (Известен: ${isKnownByMainMatcher}, Как незарег: ${isRecognizedAsUnregistered})`);
-            } else {
-                client = activeClients.get(currentLabelForFace);
-            }
-
-            if (!client) { console.error("ОШИБКА: Клиент не найден для", currentLabelForFace); continue; }
-
-            // 7. Обновляем данные клиента
-            client.lastSeen = now;
-            client.box = d.detection.box;
-            client.descriptor = currentDescriptor;
-
-            if (!isKnownByMainMatcher && !isRecognizedAsUnregistered && client.id.startsWith('unknown_')) {
-                 const box = d.detection.box; const faceArea = box.width * box.height;
-                 if (faceArea > MIN_FACE_AREA_TO_SAVE_AS_UNREG && client.tempQualityDescriptors) {
-                    client.tempQualityDescriptors.push(currentDescriptor);
-                    if (client.tempQualityDescriptors.length > MAX_TEMP_DESCRIPTORS_FOR_UNKNOWN + 2) {
-                        client.tempQualityDescriptors.shift();
-                    }
-                 }
-            }
-            
-            if (d.age) {
-                const box = d.detection.box; const faceArea = box.width * box.height;
-                if (faceArea > MIN_FACE_AREA_FOR_RELIABLE_AGE) {
-                    client.ageReadings.push(d.age);
-                    if (client.ageReadings.length > AGE_READINGS_BUFFER_SIZE) { client.ageReadings.shift(); }
-                    client.isAgeReliable = true;
-                } else { client.isAgeReliable = (client.ageReadings.length > 0); }
-                if (client.ageReadings.length > 0) { client.age = calculateMedian(client.ageReadings); }
-                else if (client.age === '?') { client.age = Math.round(d.age); client.isAgeReliable = (faceArea > MIN_FACE_AREA_FOR_RELIABLE_AGE); }
-            } else { client.isAgeReliable = false; }
-
-            client.gender = d.gender || client.gender;
-
-            if (d.expressions) {
-                client.emotionsHistory.push(d.expressions); if(client.emotionsHistory.length > 50) client.emotionsHistory.shift();
-                let currentDominant = 'neutral'; let maxProb = 0.4;
-                const latestExpressions = d.expressions;
-                if (latestExpressions) {
-                    for (const [emo, prob] of Object.entries(latestExpressions)) { if (prob > maxProb) { maxProb = prob; currentDominant = emo; } }
-                    client.dominantEmotion = currentDominant;
-                }
-            }
-
-            seenLabelsThisFrame.add(currentLabelForFace);
-
-            // Проверка зон и ЗАПИСЬ ПУТИ КЛИЕНТА
-            const currentDetectedZoneKey = checkZone(client.box, interestZones);
-            if (currentDetectedZoneKey && interestZones[currentDetectedZoneKey]) {
-                const currentDetectedZoneName = interestZones[currentDetectedZoneKey].name;
-                if (client.currentZone !== currentDetectedZoneKey) {
-                    client.currentZone = currentDetectedZoneKey;
-                    client.zoneEntryTime = now;
-                    if (currentDetectedZoneName && currentDetectedZoneName !== client.lastZoneForPathRec) {
-                        client.zonePath.push(currentDetectedZoneName);
-                        client.lastZoneForPathRec = currentDetectedZoneName;
-                    }
-                }
-                client.viewedModels.set(currentDetectedZoneName, (client.viewedModels.get(currentDetectedZoneName) || 0) + 700);
-                if ((now - client.zoneEntryTime >= ZONE_THRESHOLD) && currentDetectedZoneKey !== 'Negotiation_Table' && currentDetectedZoneKey !== 'Manager_Desk' && !client.viewedModels.has(`${currentDetectedZoneName}_INTEREST`)) {
-                    console.log(`[ИНТЕРЕС]: ${currentLabelForFace} к ${currentDetectedZoneName}`);
-                    client.viewedModels.set(`${currentDetectedZoneName}_INTEREST`, true);
-                }
-            } else {
-                client.currentZone = null;
-                client.zoneEntryTime = null;
-                // client.lastZoneForPathRec = null; // Можно сбрасывать, если нужно чтобы после выхода из зон новая зона всегда записывалась
-            }
-            
-            // Живая аналитика и флаги оповещений
-            const liveAnalysis = analyzePurchaseLikelihood(client, activeClients);
-            client.livePurchaseLikelihood = liveAnalysis.likelihood;
-            client.liveTestDriveInterest = liveAnalysis.testDriveInterest;
-            client.livePreferredBudget = liveAnalysis.preferredBudget;
-            client.liveLikelihoodReason = liveAnalysis.reason;
-            client.alertMessage = null;
-            let alertMessages = [];
-            const likelihoodNum = parseInt(client.livePurchaseLikelihood);
-            if (likelihoodNum >= 75) { alertMessages.push(`Высокая вероятность (${client.livePurchaseLikelihood})`); }
-            if (client.liveTestDriveInterest === 'Высокий') { alertMessages.push("Высокий интерес к Тест-Драйву!"); }
-            const managerDeskName = interestZones['Manager_Desk']?.name || 'Стойка менеджера';
-            let carViewedBeforeManager = false;
-            if (client.currentZone && interestZones[client.currentZone]?.name === managerDeskName && (now - (client.zoneEntryTime || now) > 15000)) {
-                client.viewedModels.forEach((time, modelName) => {
-                    if (modelName !== managerDeskName && modelName !== (interestZones['Negotiation_Table']?.name || 'Стол переговоров') && (time / 1000) > 15) {
-                        carViewedBeforeManager = true;
-                    }
-                });
-                if (carViewedBeforeManager) { alertMessages.push("У менеджера после просмотра авто!");}
-            }
-            if (alertMessages.length > 0) { client.alertMessage = alertMessages.join(' | '); }
-
-            // АВТОМАТИЧЕСКОЕ СОХРАНЕНИЕ СНИМКА
-            if (!client.isKnown && !client.autoSavedSnapshot && (now - client.entryTime > AUTO_SAVE_SNAPSHOT_TIMEOUT)) {
-                console.log(`[AUTO-SAVE TRIGGER]: Для ${client.id} прошло ${((now - client.entryTime)/1000).toFixed(0)}с. Сохраняем снимок.`);
-                await sendSnapshotDataToServer(client); // Убедитесь, что эта функция определена
-                client.autoSavedSnapshot = true;
-                // client.registrationTriggered = true; // Раскомментируйте, если не хотите показывать форму после авто-сохранения
-            }
-
-            faceapi.draw.drawDetections(canvas, d);
-            // drawClientInfo(ctx, client.box, client); // Если нужна информация прямо на видео
-
-            // Показ форм/досье
-            if (!isFormOpen && !isDossierOpen) {
-                if (client.isKnown && clientDataMap.has(client.id)) {
-                    showDossier(clientDataMap.get(client.id));
-                } else if (
-                    !client.isKnown &&
-                    !client.registrationTriggered &&
-                    (now - client.entryTime > REGISTRATION_DELAY)
-                    // && !client.autoSavedSnapshot // Можно добавить, если не хотите форму после авто-сохранения
-                ) {
-                    if (client.age !== '?' && client.gender !== '?') {
-                        client.registrationTriggered = true;
-                        showRegistrationForm(client.age, client.gender, client.id);
-                    }
-                }
-            }
-        } // Конец for (const d of detections)
-
-        // Обработка ушедших и сохранение незарегистрированных
-        for (const [label, client] of activeClients.entries()) {
-            if (!seenLabelsThisFrame.has(label)) {
-                if (now - client.lastSeen > INACTIVITY_TIMEOUT) {
-                    client.timeSpent = client.lastSeen - client.entryTime;
-                    if (client.timeSpent < 0) client.timeSpent = 0;
-                    console.log(`[УШЕЛ]: ${label}. Время: ${(client.timeSpent / 1000).toFixed(0)}с.`);
-                    await sendClientDataToServer(client);
-                    activeClients.delete(label);
-                    if (isDossierOpen && dossierDisplayPanel.style.display === 'block' && (formLinkedClientId === label || (client.isKnown && clientDataMap.get(label) && dossierName.textContent === clientDataMap.get(label).name))) { hideDossier(); }
-                    if (isFormOpen && registrationForm.style.display === 'block' && formLinkedClientId === label) { hideRegistrationForm(); }
-                }
-            } else {
-                 if (!client.isKnown && client.id.startsWith('unknown_') && !unregisteredFaces.has(client.id) && client.tempQualityDescriptors && client.tempQualityDescriptors.length >= MIN_QUALITY_DESCRIPTORS_TO_SAVE_UNREG && (now - client.entryTime > MIN_TIME_TO_SAVE_UNKNOWN_AS_UNREG) ) {
-                    unregIdCounter++; const newUnregId = `unreg_${unregIdCounter}`;
-                    const repDescriptor = getRepresentativeDescriptor(client.tempQualityDescriptors);
-                    if(repDescriptor){
-                        unregisteredFaces.set(newUnregId, { id: newUnregId, descriptors: [repDescriptor], firstSeen: client.entryTime, lastSeen: now, ageEstimate: client.age, genderEstimate: client.gender });
-                        console.log(`[NEW UNREG]: ${client.id} сохранен как ${newUnregId}.`);
-                        const oldClientData = activeClients.get(client.id);
-                        if(oldClientData){
-                            oldClientData.id = newUnregId; oldClientData.tempQualityDescriptors = [];
-                            activeClients.delete(label); activeClients.set(newUnregId, oldClientData);
-                            if (formLinkedClientId === label) { formLinkedClientId = newUnregId; if(clientIdInput) clientIdInput.value = newUnregId; }
-                        }
-                    } else { console.warn("Не удалось получить репр. дескриптор для", client.id); }
-                }
-            }
-        }
-        if(statusText) statusText.innerText = `Активных: ${activeClients.size} (Незарег: ${unregisteredFaces.size}) Форма: ${isFormOpen} Досье: ${isDossierOpen}`;
-    }    // --- Запуск и интервал (из v6.0) ---
-    async function startDetection() {
-        console.log("Вызвана функция startDetection.");
-        if (!canvas) {
-            if (!videoContainer) { console.error("videoContainer не найден!"); return; }
-            canvas = faceapi.createCanvasFromMedia(video); videoContainer.appendChild(canvas);
-        }
-        const displaySize = { width: video.width, height: video.height };
-        faceapi.matchDimensions(canvas, displaySize);
-        if (detectionInterval) clearInterval(detectionInterval);
-        detectionInterval = setInterval(async () => {
-            try {
-                const detections = await faceapi.detectAllFaces(video, new faceapi.SsdMobilenetv1Options()).withFaceLandmarks().withFaceDescriptors().withAgeAndGender().withFaceExpressions();
-                const resizedDetections = faceapi.resizeResults(detections, displaySize);
-                const ctx = canvas.getContext("2d"); ctx.clearRect(0, 0, canvas.width, canvas.height);
-                if(Object.keys(interestZones).length > 0) drawZones(ctx, interestZones);
-                await processMultipleDetections(resizedDetections, displaySize, canvas);
-            } catch (error) {
-                console.error("ОШИБКА в цикле обнаружения:", error);
-                if(statusText) statusText.innerText = "Ошибка обнаружения!";
-                if (detectionInterval) clearInterval(detectionInterval); detectionInterval = null;
-            }
-        }, 700); // 700ms - хороший баланс между производительностью и реакцией
-    }
-
-    const run = async () => {
-        console.log("Вызвана функция run."); if(statusText) statusText.innerText = "Загрузка моделей...";
-        const models = ['ssdMobilenetv1', 'faceLandmark68Net', 'faceRecognitionNet', 'ageGenderNet', 'faceExpressionNet'];
-        for (const modelName of models) {
-            try {
-                await faceapi.nets[modelName].loadFromUri("./models");
-                console.log(`УСПЕХ: ${modelName} загружена.`);
-            } catch (error) {
-                console.error(`!!! ОШИБКА загрузки ${modelName}:`, error);
-                if(statusText) statusText.innerText = `Ошибка загрузки ${modelName}!`;
-                return;
-            }
-        }
-        await loadClientData();
-        faceMatcher = await loadLabeledImagesAndMatcher(labels);
-
-        if(statusText) statusText.innerText = "Запуск видеопотока...";
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: {} });
-            video.srcObject = stream;
-        } catch (err) {
-            console.error("Ошибка доступа к камере:", err);
-            if(statusText) statusText.innerText = "ОШИБКА: Нет доступа к камере!";
-            alert("Нет доступа к камере!"); return;
-        }
-        video.addEventListener("play", () => {
-            console.log("Событие 'play'. Вызываю startDetection...");
-            startDetection();
-            setInterval(updateDashboard, 1000); // Обновляем дашборд каждую секунду
-        });
-    };
-
-    console.log("Вызываю run()...");
-    run();
-    function initializeCharts() {
-        const likelihoodCtx = document.getElementById('likelihoodChart')?.getContext('2d');
-        const testDriveCtx = document.getElementById('testDriveChart')?.getContext('2d');
-
-        if (likelihoodCtx) {
-            likelihoodChartInstance = new Chart(likelihoodCtx, {
-                type: 'doughnut', // или 'pie', 'bar'
-                data: {
-                    labels: ['Низкая (<50%)', 'Средняя (50-74%)', 'Высокая (>=75%)'],
-                    datasets: [{
-                        label: 'Вероятность Покупки',
-                        data: [0, 0, 0], // Начальные данные
-                        backgroundColor: [
-                            'rgba(255, 99, 132, 0.7)', // Красный для низкой
-                            'rgba(255, 206, 86, 0.7)', // Желтый для средней
-                            'rgba(75, 192, 192, 0.7)'  // Зеленый для высокой
-                        ],
-                        borderColor: [
-                            'rgba(255, 99, 132, 1)',
-                            'rgba(255, 206, 86, 1)',
-                            'rgba(75, 192, 192, 1)'
-                        ],
-                        borderWidth: 1
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: true, // Отключаем, чтобы max-height работал лучше
-                    plugins: {
-                        legend: { position: 'top', labels: { color: '#c9d1d9'} },
-                        title: { display: true, text: 'Распределение по Вероятности Покупки', color: '#c9d1d9' }
-                    }
-                }
-            });
-        } else {
-            console.error("Canvas для likelihoodChart не найден!");
-        }
-
-        if (testDriveCtx) {
-            testDriveChartInstance = new Chart(testDriveCtx, {
-                type: 'pie', // или 'doughnut', 'bar'
-                data: {
-                    labels: ['Высокий', 'Средний', 'Низкий/Нет'],
-                    datasets: [{
-                        label: 'Интерес к Тест-Драйву',
-                        data: [0, 0, 0], // Начальные данные
-                        backgroundColor: [
-                            'rgba(75, 192, 192, 0.7)',  // Зеленый
-                            'rgba(255, 206, 86, 0.7)', // Желтый
-                            'rgba(255, 99, 132, 0.7)'  // Красный
-                        ],
-                        borderColor: [
-                            'rgba(75, 192, 192, 1)',
-                            'rgba(255, 206, 86, 1)',
-                            'rgba(255, 99, 132, 1)'
-                        ],
-                        borderWidth: 1
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: true,
-                    plugins: {
-                        legend: { position: 'top', labels: {color: '#c9d1d9'} },
-                        title: { display: true, text: 'Интерес к Тест-Драйву', color: '#c9d1d9' }
-                    }
-                }
-            });
-        } else {
-            console.error("Canvas для testDriveChart не найден!");
-        }
-    }
-});
-const run = async () => {
-    // ... ваш существующий код загрузки моделей, данных, запуска видео ...
-    video.addEventListener("play", () => {
-        console.log("Событие 'play'. Вызываю startDetection...");
-        startDetection();
-        setInterval(updateDashboard, 1000); // Обновляем дашборд каждую секунду
-        initializeCharts(); // <<< ВЫЗЫВАЕМ ИНИЦИАЛИЗАЦИЮ ДИАГРАММ ЗДЕСЬ
-    });
-};
+    <script defer src="face-api.min.js"></script>
+    <script defer src="scripts.js"></script> </body>
+</html>
